@@ -165,10 +165,24 @@ eingehängten `docker-init` verweigert. Die Compose-Datei kommt bewusst ohne
 Kindprozesse. Sollte die Zeile in einer eigenen Abwandlung wieder auftauchen,
 gehört sie hier wieder heraus.
 
-**Container startet nicht und die Härtung ist verdächtig.** Zum Eingrenzen
-`read_only`, `cap_drop` und `security_opt` vorübergehend auskommentieren und
-einzeln wieder zuschalten. Alle drei sind für den Betrieb nicht zwingend, aber
-sinnvoll – die Anwendung schreibt nichts und braucht keine Capabilities.
+### Zusatzhärtung nachrüsten
+
+Die Compose-Datei verzichtet auf `read_only`, `cap_drop: ALL` und
+`no-new-privileges`. Auf einem gehärteten Ubuntu-Host verhinderten sie den
+Containerstart (Exit 255 in einer Neustartschleife), und für den Betrieb werden
+sie nicht gebraucht: die Anwendung läuft als unprivilegierter Nutzer, schreibt
+nichts auf die Platte und hält keine Daten.
+
+Wer sie trotzdem möchte, prüft jede Option einzeln gegen den eigenen Host –
+`exit=124` bedeutet, dass der Start geklappt hat und nur die Zeitgrenze zuschlug:
+
+```bash
+timeout 4 docker run --rm --read-only ev-calculator:latest; echo $?
+timeout 4 docker run --rm --cap-drop ALL ev-calculator:latest; echo $?
+timeout 4 docker run --rm --security-opt no-new-privileges:true ev-calculator:latest; echo $?
+```
+
+Was durchläuft, kann in `docker-compose.yml` ergänzt werden.
 
 **`WARN The "BIND_ADDR" variable is not set.`** Harmlos: die Variable ist
 optional. Wer die Meldung nicht sehen will, legt eine Datei `.env` mit der
@@ -216,9 +230,7 @@ Der Container fährt auf SIGTERM geordnet herunter (gemessen rund 0,1 Sekunden),
 | --- | --- |
 | Basis | `node:22-alpine`, keine Laufzeitabhängigkeiten, kein Build-Schritt |
 | Nutzer | unprivilegierter Nutzer `node`, nicht root |
-| Dateisystem | `read_only: true` – die Anwendung schreibt nichts auf die Platte |
-| Rechte | `cap_drop: ALL`, `no-new-privileges` |
-| Grenzen | 256 MB Speicher, 1 CPU |
+| Grenzen | 512 MB Speicher, 1 CPU |
 | Healthcheck | `GET /api/health` alle 30 Sekunden |
 | Logs | json-file, rotiert bei 10 MB, 3 Dateien |
 | Neustart | `unless-stopped` |

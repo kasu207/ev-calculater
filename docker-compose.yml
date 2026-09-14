@@ -38,18 +38,16 @@ services:
       start_period: 10s
       retries: 3
 
-    # Die Anwendung schreibt nichts auf die Platte und speichert keine
-    # Nutzerdaten - ein schreibgeschütztes Dateisystem kostet hier nichts.
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
+    # Zusatzhärtung (read_only, cap_drop, no-new-privileges) ist bewusst nicht
+    # aktiv: sie hat auf einem gehärteten Ubuntu-Host den Containerstart
+    # verhindert. Für den Betrieb wird sie nicht gebraucht - die Anwendung
+    # läuft als unprivilegierter Nutzer, schreibt nichts und hält keine Daten.
+    # Wer sie einschalten will, prüft die Optionen einzeln, siehe README.
 
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
           cpus: "1.0"
 
     logging:
