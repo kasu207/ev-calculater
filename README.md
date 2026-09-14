@@ -145,6 +145,34 @@ test/        Tests mit dem Node-Testrunner
 - Jedes Diagramm hat eine Legende, Direktbeschriftung und eine Tabellenansicht.
 - Vollständig bedienbar ab 390 px Breite, ohne horizontales Scrollen der Seite.
 
+## Entwicklung mit Claude Code
+
+Das Repository aktiviert in `.claude/settings.json` das Plugin
+[Superpowers](https://github.com/obra/superpowers) (v6.3.0, MIT, Autor Jesse Vincent) aus
+dem offiziellen Anthropic-Marketplace `claude-plugins-official`:
+
+```json
+{ "enabledPlugins": { "superpowers@claude-plugins-official": true } }
+```
+
+Wer das Repository auscheckt und darin eine Claude-Code-Sitzung startet, bekommt das
+Plugin automatisch installiert – der offizielle Marketplace registriert sich beim Start
+von selbst, eine zusätzliche Quelle ist nicht einzutragen.
+
+Das Plugin liefert 14 Skills für die Arbeitsweise des Agenten, unter anderem
+`brainstorming`, `writing-plans`, `test-driven-development`, `systematic-debugging`,
+`requesting-code-review` und `verification-before-completion`. Dazu kommt ein
+SessionStart-Hook, der die Einstiegs-Skill `using-superpowers` als Sitzungskontext
+einspielt.
+
+Zwei Hinweise dazu:
+
+- Das Plugin ist Fremdcode. Der Marketplace-Eintrag ist auf einen festen Commit gepinnt
+  (`b36e082`, entspricht Release v6.3.0), sodass sich der Inhalt nicht unbemerkt ändert.
+- Wer es für sich abschalten will, setzt in `.claude/settings.local.json`
+  (gitignoriert) `{"enabledPlugins": {"superpowers@claude-plugins-official": false}}` –
+  lokale Einstellungen haben Vorrang vor den Projekteinstellungen.
+
 ## Datenbasis und Grenzen
 
 Fahrzeugdaten sind **Richtwerte nach Herstellerangabe (Stand 2025/2026)** und ersetzen

@@ -1,4 +1,7 @@
 node_modules/
+
+# Persönliche Claude-Code-Overrides, nicht teamweit
+.claude/settings.local.json
 npm-debug.log*
 .DS_Store
 .env
