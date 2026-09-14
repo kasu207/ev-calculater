@@ -1,0 +1,16 @@
+{
+  "name": "ev-calculater",
+  "version": "1.0.0",
+  "description": "Rechner: Ab wann lohnt sich der Umstieg auf ein E-Auto?",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}

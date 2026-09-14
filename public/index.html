@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>E-Auto-Rechner - Ab wann lohnt sich der Umstieg?</title>
+    <meta
+      name="description"
+      content="Berechnen Sie mit Ihren eigenen Kosten, ab wann sich ein E-Auto gegenüber Ihrem jetzigen Verbrenner rechnet - inklusive Fahrzeugempfehlung und Angebotsvarianten."
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M18 5 9 18h6l-1 9 9-13h-6z' fill='%23fff'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#wizard">Zum Rechner springen</a>
+
+    <header class="site-header">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28">
+            <rect width="32" height="32" rx="8" fill="currentColor" />
+            <path d="M18 5 9 18h6l-1 9 9-13h-6z" fill="var(--surface-0)" />
+          </svg>
+        </span>
+        <span class="brand__text">
+          <strong>E-Auto-Rechner</strong>
+          <small>Ab wann lohnt sich der Umstieg?</small>
+        </span>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="themeToggle" class="btn btn--ghost" aria-pressed="false">
+          Dunkles Design
+        </button>
+        <button type="button" id="resetBtn" class="btn btn--ghost">Zurücksetzen</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <h1>Rechnet sich ein E-Auto für Sie?</h1>
+        <p>
+          Der Rechner vergleicht Ihr heutiges Auto mit passenden Elektromodellen - mit Ihren
+          Verbrauchswerten, Ihrer Versicherung, Ihrer Steuer und Ihrem Ladepreis. Am Ende steht
+          eine konkrete Empfehlung und der Zeitpunkt, ab dem der Umstieg günstiger ist.
+        </p>
+      </section>
+
+      <nav class="stepper" aria-label="Fortschritt">
+        <ol id="stepper"></ol>
+      </nav>
+
+      <form id="wizard" class="wizard" novalidate></form>
+
+      <div class="wizard-nav">
+        <button type="button" class="btn btn--ghost" id="prevBtn">Zurück</button>
+        <span class="wizard-nav__spacer"></span>
+        <button type="button" class="btn btn--primary" id="nextBtn">Weiter</button>
+      </div>
+
+      <section id="result" class="result" aria-live="polite" hidden></section>
+
+      <footer class="site-footer">
+        <h2>Annahmen und Grenzen des Modells</h2>
+        <ul>
+          <li>
+            Alle Fahrzeugdaten sind Richtwerte nach Herstellerangabe
+            (<span id="dataVintage">Stand 2025/2026</span>) und ersetzen kein Angebot.
+          </li>
+          <li>
+            Der Wertverlust wird geometrisch gerechnet: ein gleichbleibender Prozentsatz pro Jahr
+            auf den jeweiligen Restwert.
+          </li>
+          <li>
+            Kaufpreise sind Listenpreise. Der in den Angebotsvarianten angesetzte Nachlass ist ein
+            branchenüblicher Richtwert, kein zugesagter Rabatt.
+          </li>
+          <li>
+            Nicht enthalten sind Preissteigerungen bei Kraftstoff und Strom, Reparaturrisiken des
+            Altfahrzeugs sowie steuerliche Effekte bei gewerblicher Nutzung.
+          </li>
+          <li>Die Berechnung läuft vollständig in Ihrer Sitzung. Es werden keine Daten gespeichert oder weitergegeben.</li>
+        </ul>
+      </footer>
+    </main>
+
+    <div class="livebar" id="livebar" hidden></div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
