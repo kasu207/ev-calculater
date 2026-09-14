@@ -20,8 +20,9 @@ ES-Module im Browser.
    bewertete Fahrzeugempfehlungen, Angebotsvarianten und ein fertiger Anfragetext
    für den Händler.
 
-Das Ergebnis aktualisiert sich bei jeder Eingabe; eine schwebende Leiste zeigt die
-aktuelle Empfehlung schon während der Eingabe.
+Das Ergebnis aktualisiert sich bei jeder Eingabe. Alle Felder sind mit realistischen
+Werten vorbelegt, deshalb steht schon vor der ersten Eingabe ein vollständiges Ergebnis
+bereit - "Ergebnis mit Standardwerten" springt direkt dorthin, verfeinert wird danach.
 
 ## Zwei Vergleichsszenarien
 
@@ -44,8 +45,14 @@ vorteil(t) = förderung − wallbox
 ```
 
 Zum Zeitpunkt 0 bleibt `förderung − wallbox` übrig, weil sich Kaufpreise und Restwerte
-auf beiden Seiten aufheben. Der **Break-even** ist der erste Monat, in dem `vorteil(t)`
-das Vorzeichen wechselt; gerechnet wird monatsgenau, dargestellt in Jahresschritten.
+auf beiden Seiten aufheben. Dieser Startwert ist **kein** Break-even: ohne Förderung ist er
+exakt 0, im Monat darauf liegt das E-Auto durch den höheren Wertverlust zunächst zurück.
+
+Der **Break-even** ist deshalb der erste Monat, ab dem `vorteil(t)` bis zum Ende des
+Zeitraums positiv bleibt - gesucht wird rückwärts der letzte Vorzeichenwechsel, nicht
+vorwärts der erste. Ein Zwischenhoch, das später wieder ins Minus kippt, zählt nicht.
+Gerechnet wird monatsgenau, dargestellt in Jahresschritten. Trägt eine Förderung den
+Mehrpreis von Beginn an, meldet der Rechner "sofort" statt einer Dauer.
 
 Restwerte fallen geometrisch (gleichbleibender Prozentsatz pro Jahr auf den jeweiligen
 Restwert). Kapitalkosten laufen auf das zusätzlich gebundene Geld
@@ -271,6 +278,19 @@ test/        Tests mit dem Node-Testrunner
 Dockerfile
 docker-compose.yml
 ```
+
+## Bedienung
+
+- **Eine Leiste am unteren Rand** statt verstreuter Bedienelemente: sie zeigt den
+  Zwischenstand, führt durch die Schritte und wechselt ab dem Ergebnis auf "Angaben
+  ändern" und "Fahrzeuge ansehen".
+- **Kurze Schritte**: jeder Schritt zeigt nur seine Hauptfelder, die Feinwerte stehen
+  darunter in einem Klappbereich. Kein Wert geht dabei verloren.
+- **Zahlenfelder mit Minus und Plus** neben dem Eingabefeld, Bedienflächen ab 44 px.
+- **Schrittleiste** als Fortschrittsbalken mit antippbaren Nummern; jeder Schritt ist
+  jederzeit direkt erreichbar.
+- Der Wechsel zwischen hellem und dunklem Design ist ein reines Symbol im Kopfbereich -
+  eine Einstellung, keine Hauptaktion.
 
 ## Barrierefreiheit und Darstellung
 

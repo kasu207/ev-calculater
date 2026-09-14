@@ -2,12 +2,14 @@
 <html lang="de">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>E-Auto-Rechner - Ab wann lohnt sich der Umstieg?</title>
     <meta
       name="description"
       content="Berechnen Sie mit Ihren eigenen Kosten, ab wann sich ein E-Auto gegenüber Ihrem jetzigen Verbrenner rechnet - inklusive Fahrzeugempfehlung und Angebotsvarianten."
     />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" id="themeColor" />
     <link rel="stylesheet" href="styles.css" />
     <link
       rel="icon"
@@ -20,8 +22,8 @@
     <header class="site-header">
       <div class="brand">
         <span class="brand__mark" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="28" height="28">
-            <rect width="32" height="32" rx="8" fill="currentColor" />
+          <svg viewBox="0 0 32 32" width="26" height="26">
+            <rect width="32" height="32" rx="9" fill="currentColor" />
             <path d="M18 5 9 18h6l-1 9 9-13h-6z" fill="var(--surface-0)" />
           </svg>
         </span>
@@ -31,33 +33,63 @@
         </span>
       </div>
       <div class="header-actions">
-        <button type="button" id="themeToggle" class="btn btn--ghost" aria-pressed="false">
-          Dunkles Design
+        <button type="button" id="resetBtn" class="btn btn--quiet btn--sm">Zurücksetzen</button>
+        <!-- Nur ein Symbol: der Moduswechsel ist eine Einstellung, keine Hauptaktion. -->
+        <button
+          type="button"
+          id="themeToggle"
+          class="icon-btn"
+          aria-pressed="false"
+          aria-label="Dunkles Design einschalten"
+          title="Dunkles Design einschalten"
+        >
+          <svg class="icon icon--sun" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.4" />
+            <g class="icon__rays">
+              <path d="M12 2.2v2.4M12 19.4v2.4M2.2 12h2.4M19.4 12h2.4M5.1 5.1l1.7 1.7M17.2 17.2l1.7 1.7M18.9 5.1l-1.7 1.7M6.8 17.2l-1.7 1.7" />
+            </g>
+          </svg>
+          <svg class="icon icon--moon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 14.4A8.4 8.4 0 0 1 9.6 4a8.4 8.4 0 1 0 10.4 10.4z" />
+          </svg>
         </button>
-        <button type="button" id="resetBtn" class="btn btn--ghost">Zurücksetzen</button>
       </div>
     </header>
 
     <main>
-      <section class="intro">
+      <section class="hero">
+        <p class="hero__eyebrow">Wirtschaftlichkeitsvergleich</p>
         <h1>Rechnet sich ein E-Auto für Sie?</h1>
-        <p>
-          Der Rechner vergleicht Ihr heutiges Auto mit passenden Elektromodellen - mit Ihren
-          Verbrauchswerten, Ihrer Versicherung, Ihrer Steuer und Ihrem Ladepreis. Am Ende steht
-          eine konkrete Empfehlung und der Zeitpunkt, ab dem der Umstieg günstiger ist.
+        <p class="hero__lead">
+          Ihr heutiges Auto gegen passende Elektromodelle - mit Ihrem Verbrauch, Ihrer
+          Versicherung, Ihrer Steuer und Ihrem Ladepreis. Am Ende steht eine konkrete
+          Empfehlung und der Zeitpunkt, ab dem der Umstieg günstiger ist.
         </p>
+        <div class="hero__actions">
+          <button type="button" class="btn btn--primary btn--lg" id="startBtn">
+            Angaben machen
+          </button>
+          <button type="button" class="btn btn--quiet btn--lg" id="quickResultBtn">
+            Ergebnis mit Standardwerten
+          </button>
+        </div>
+        <ul class="hero__facts">
+          <li><strong>4 Schritte</strong><span>rund zwei Minuten</span></li>
+          <li><strong id="heroModels">Modelldaten</strong><span id="heroVintage">werden geladen</span></li>
+          <li><strong>Ohne Konto</strong><span>alles bleibt in Ihrer Sitzung</span></li>
+        </ul>
       </section>
 
-      <nav class="stepper" aria-label="Fortschritt">
-        <ol id="stepper"></ol>
-      </nav>
+      <div class="wizard-shell" id="wizardShell">
+        <nav class="stepper" aria-label="Fortschritt">
+          <p class="stepper__count" id="stepCount">Schritt 1 von 4</p>
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress">
+            <span class="progress__bar" id="progressBar"></span>
+          </div>
+          <ol id="stepper"></ol>
+        </nav>
 
-      <form id="wizard" class="wizard" novalidate></form>
-
-      <div class="wizard-nav">
-        <button type="button" class="btn btn--ghost" id="prevBtn">Zurück</button>
-        <span class="wizard-nav__spacer"></span>
-        <button type="button" class="btn btn--primary" id="nextBtn">Weiter</button>
+        <form id="wizard" class="wizard" novalidate></form>
       </div>
 
       <section id="result" class="result" aria-live="polite" hidden></section>
@@ -78,6 +110,11 @@
             branchenüblicher Richtwert, kein zugesagter Rabatt.
           </li>
           <li>
+            Break-even ist der Zeitpunkt, ab dem der Vorteil des E-Autos dauerhaft positiv bleibt.
+            Der Startwert zum Zeitpunkt null ist kein Break-even: dort heben sich Kaufpreis und
+            Restwert auf beiden Seiten auf.
+          </li>
+          <li>
             Die Preisentwicklung von Kraftstoff und Strom geht als reale jährliche Steigerung ein,
             also zusätzlich zur allgemeinen Inflation. Alle Beträge sind heutige Euro. Die
             Voreinstellungen sind Annahmen, keine Prognose - der Verlauf lässt sich frei ändern.
@@ -91,7 +128,31 @@
       </footer>
     </main>
 
-    <div class="livebar" id="livebar" hidden></div>
+    <!-- Eine einzige Leiste unten: Fortschritt, Zwischenstand und Navigation.
+         Sie klebt am unteren Rand, damit der Weg zum Ergebnis mobil kurz bleibt. -->
+    <div class="actionbar" id="actionbar">
+      <div class="actionbar__inner">
+        <div class="livebar" id="livebar" hidden></div>
+        <div class="wizard-nav" id="wizardNav">
+          <button type="button" class="btn btn--quiet" id="prevBtn">
+            <span class="btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+            </span>
+            <span>Zurück</span>
+          </button>
+          <button type="button" class="btn btn--primary" id="nextBtn">
+            <span id="nextLabel">Weiter</span>
+            <span class="btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
+            </span>
+          </button>
+        </div>
+        <div class="actionbar__result" id="resultNav" hidden>
+          <button type="button" class="btn btn--quiet" id="editBtn">Angaben ändern</button>
+          <button type="button" class="btn btn--primary" id="vehiclesBtn">Fahrzeuge ansehen</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="app.js"></script>
   </body>

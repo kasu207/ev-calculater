@@ -19,8 +19,10 @@
  *              - kapitalkosten(t)
  *
  * Zum Zeitpunkt 0 bleibt genau `förderung - wallbox` übrig, weil sich
- * Kaufpreise und Restwerte auf beiden Seiten aufheben. Der Break-even ist der
- * erste Monat, in dem vorteil(t) das Vorzeichen wechselt.
+ * Kaufpreise und Restwerte auf beiden Seiten aufheben. Dieser Startwert ist
+ * kein Ergebnis, sondern eine Buchungsgröße - er darf deshalb nie als
+ * Break-even gemeldet werden. Break-even ist der erste Monat, ab dem der
+ * Vorteil dauerhaft positiv bleibt.
  *
  * Die laufenden Kosten werden monatlich aufsummiert, weil Kraftstoff und Strom
  * unterschiedlich schnell teurer werden. Alle Beträge sind heutige Euro, die
@@ -131,6 +133,36 @@ export function referenceScenario(input, vehicle) {
 }
 
 /**
+ * Break-even: der erste Monat, ab dem der Vorteil bis zum Ende des Zeitraums
+ * positiv bleibt.
+ *
+ * Gesucht wird deshalb rückwärts der letzte Monat im Minus, nicht vorwärts der
+ * erste Vorzeichenwechsel. Ohne Förderung und ohne Wallbox ist vorteil(0)
+ * nämlich exakt 0 - Kaufpreise und Restwerte heben sich zu diesem Zeitpunkt
+ * auf. Ein vorwärts suchender Test liest daraus "Break-even nach 0 Monaten",
+ * obwohl das E-Auto im Monat darauf durch den höheren Wertverlust erst einmal
+ * zurückfällt. Auch ein kurzes Zwischenhoch, das später wieder ins Minus
+ * kippt, ist kein Break-even.
+ *
+ * Rückgabe: 0, wenn der Vorteil nie negativ wird; null, wenn er am Ende des
+ * Zeitraums noch negativ ist; sonst der linear interpolierte Monat des letzten
+ * Vorzeichenwechsels.
+ */
+export function findBreakEvenMonths(monthly) {
+  let lastNegative = -1;
+  for (let m = 0; m < monthly.length; m++) {
+    if (monthly[m].advantage < 0) lastNegative = m;
+  }
+  if (lastNegative === monthly.length - 1) return null;
+  if (lastNegative === -1) return 0;
+
+  const prev = monthly[lastNegative];
+  const cur = monthly[lastNegative + 1];
+  const span = cur.advantage - prev.advantage;
+  return span === 0 ? cur.month : lastNegative + -prev.advantage / span;
+}
+
+/**
  * Vollständiger Vergleich für ein Fahrzeug. Rechnet monatsgenau und liefert
  * zusätzlich Jahreswerte für die Grafik.
  */
@@ -201,20 +233,7 @@ export function compareVehicle(rawInput, vehicle) {
     });
   }
 
-  let breakEvenMonths = null;
-  if (monthly[0].advantage >= 0) {
-    breakEvenMonths = 0;
-  } else {
-    for (let m = 1; m < monthly.length; m++) {
-      const prev = monthly[m - 1];
-      const cur = monthly[m];
-      if (prev.advantage < 0 && cur.advantage >= 0) {
-        const span = cur.advantage - prev.advantage;
-        breakEvenMonths = m - 1 + (span === 0 ? 0 : -prev.advantage / span);
-        break;
-      }
-    }
-  }
+  const breakEvenMonths = findBreakEvenMonths(monthly);
 
   const yearly = monthly
     .filter((p) => p.month % MONTHS === 0)

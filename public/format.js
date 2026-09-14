@@ -24,15 +24,31 @@ export function signedMoney(v) {
   return `${n > 0 ? '+' : ''}${money(n)}`;
 }
 
-/** Jahreswert als "3 Jahre 4 Monate". */
+/** Jahreswert als "3 Jahre 4 Monate". Null Monate heisst: von Beginn an. */
 export function duration(years) {
   if (years === null || years === undefined) return 'nicht erreicht';
   const totalMonths = Math.round(years * 12);
+  if (totalMonths <= 0) return 'sofort';
   const y = Math.floor(totalMonths / 12);
   const m = totalMonths % 12;
   if (y === 0) return `${m} Monate`;
   if (m === 0) return `${y} ${y === 1 ? 'Jahr' : 'Jahre'}`;
   return `${y} ${y === 1 ? 'Jahr' : 'Jahre'} ${m} Mon.`;
+}
+
+/**
+ * Dieselbe Dauer im Dativ, für Sätze mit "nach" oder "ab".
+ * Ohne das steht dort "nach 7 Jahre" statt "nach 7 Jahren".
+ */
+export function durationAfter(years) {
+  if (years === null || years === undefined) return 'nicht erreicht';
+  const totalMonths = Math.round(years * 12);
+  if (totalMonths <= 0) return 'sofort';
+  const y = Math.floor(totalMonths / 12);
+  const m = totalMonths % 12;
+  if (y === 0) return `${m} Monaten`;
+  if (m === 0) return `${y} ${y === 1 ? 'Jahr' : 'Jahren'}`;
+  return `${y} ${y === 1 ? 'Jahr' : 'Jahren'} ${m} Mon.`;
 }
 
 export function km(v) {

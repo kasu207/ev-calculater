@@ -134,6 +134,8 @@ const routes = {
         ? {
             scenario: otherScenario,
             vehicleId: counterBest.vehicleId,
+            years: counterBest.years,
+            breakEvenMonths: counterBest.breakEvenMonths,
             breakEvenYears: counterBest.breakEvenYears,
             totalAdvantage: counterBest.totalAdvantage,
           }

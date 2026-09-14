@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { withDefaults, defaults } from '../shared/defaults.js';
-import { compareVehicle, blendedKwhPrice, residualValue, annualCostsIce } from '../shared/calc.js';
+import {
+  compareVehicle,
+  blendedKwhPrice,
+  residualValue,
+  annualCostsIce,
+  findBreakEvenMonths,
+} from '../shared/calc.js';
 import { evaluateVehicle, recommend, requiredRange } from '../shared/match.js';
 import { buildOffers, annuity } from '../shared/offers.js';
 import { vehicles, vehicleById } from '../shared/vehicles.js';
@@ -59,6 +65,34 @@ test('Break-even liegt dort, wo der Vorteil das Vorzeichen wechselt', () => {
   if (result.breakEvenMonths === null) return;
   const before = result.yearly.filter((p) => p.year < result.breakEvenYears);
   for (const p of before) assert.ok(p.advantage < 0.01);
+});
+
+test('Ohne Förderung und Wallbox ist der Start kein Break-even', () => {
+  // Regression: vorteil(0) ist dann exakt 0, weil sich Kaufpreis und Restwert
+  // aufheben. Früher wurde daraus "Break-even nach 0 Monaten" gemeldet.
+  const input = withDefaults({ ev: { wallboxCost: 0, subsidy: 0 } });
+  const result = compareVehicle(input, vehicleById('mg4'));
+  assert.equal(result.yearly[0].advantage, 0);
+  assert.ok(result.breakEvenMonths === null || result.breakEvenMonths > 1);
+});
+
+test('Break-even ist der letzte Vorzeichenwechsel, nicht ein Zwischenhoch', () => {
+  const monthly = [
+    { month: 0, advantage: 500 },
+    { month: 1, advantage: 100 },
+    { month: 2, advantage: -100 },
+    { month: 3, advantage: 100 },
+  ];
+  assert.equal(findBreakEvenMonths(monthly), 2.5);
+  assert.equal(findBreakEvenMonths([{ month: 0, advantage: 0 }, { month: 1, advantage: 5 }]), 0);
+  assert.equal(findBreakEvenMonths([{ month: 0, advantage: 5 }, { month: 1, advantage: -5 }]), null);
+});
+
+test('Eine Förderung über allen Kosten trägt den Vorteil von Beginn an', () => {
+  const input = withDefaults({ ev: { wallboxCost: 0, subsidy: 20000, capitalCostRate: 0 } });
+  const result = compareVehicle(input, vehicleById('dacia-spring'));
+  assert.equal(result.breakEvenMonths, 0);
+  assert.ok(result.yearly.every((p) => p.advantage >= 0));
 });
 
 test('Höhere Fahrleistung verkürzt den Break-even', () => {

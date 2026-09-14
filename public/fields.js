@@ -1,12 +1,17 @@
 /**
  * Feldschema des Assistenten. Ein Eintrag beschreibt Pfad, Beschriftung,
  * Einheit, Wertebereich und Hilfetext - das Formular wird daraus erzeugt.
+ *
+ * `advanced: true` nimmt ein Feld aus der Hauptansicht heraus. Es steht dann
+ * im aufklappbaren Bereich des Schritts. So bleibt jeder Schritt auf dem
+ * Telefon kurz genug, ohne dass eine Stellschraube verloren geht.
  */
 
 export const steps = [
   {
     id: 'profil',
     title: 'Fahrprofil',
+    short: 'Profil',
     lead: 'Wie viel und wie weit fahren Sie? Danach richtet sich fast alles Weitere.',
     fields: [
       {
@@ -54,6 +59,8 @@ export const steps = [
   {
     id: 'auto',
     title: 'Aktuelles Auto',
+    short: 'Auto',
+    advancedTitle: 'Weitere Kostenpositionen',
     lead: 'Verkaufswert und alle laufenden Kosten des Fahrzeugs, das Sie heute fahren.',
     fields: [
       { path: 'current.label', label: 'Fahrzeug (optional)', type: 'text', placeholder: 'z. B. VW Golf VII 1.5 TSI' },
@@ -110,6 +117,7 @@ export const steps = [
       },
       {
         path: 'current.otherCosts',
+        advanced: true,
         label: 'Sonstige Fixkosten pro Jahr',
         unit: 'EUR',
         type: 'number',
@@ -120,6 +128,7 @@ export const steps = [
       },
       {
         path: 'current.depreciationRate',
+        advanced: true,
         label: 'Jährlicher Wertverlust',
         unit: '%',
         type: 'percent',
@@ -133,6 +142,8 @@ export const steps = [
   {
     id: 'strom',
     title: 'Energiepreise und Laden',
+    short: 'Energie',
+    advancedTitle: 'Preisentwicklung, Wertverlust und Feinwerte',
     lead: 'Der Ladepreis entscheidet über die laufende Ersparnis. Zu Hause laden ist meist halb so teuer wie Schnellladen. Darunter legen Sie fest, wie sich Kraftstoff und Strom über den Betrachtungszeitraum entwickeln.',
     fields: [
       {
@@ -149,6 +160,7 @@ export const steps = [
       { path: 'ev.publicPrice', label: 'Preis öffentliches Laden', unit: 'EUR/kWh', type: 'number', min: 0, max: 1.5, step: 0.01 },
       {
         path: 'ev.chargingLossPct',
+        advanced: true,
         label: 'Ladeverlust',
         unit: '%',
         type: 'percent',
@@ -159,6 +171,7 @@ export const steps = [
       },
       {
         path: 'prices.fuelGrowth',
+        advanced: true,
         label: 'Preissteigerung Kraftstoff pro Jahr',
         unit: '%',
         type: 'percent',
@@ -169,6 +182,7 @@ export const steps = [
       },
       {
         path: 'prices.electricityGrowth',
+        advanced: true,
         label: 'Preissteigerung Strom pro Jahr',
         unit: '%',
         type: 'percent',
@@ -199,6 +213,7 @@ export const steps = [
       },
       {
         path: 'ev.thgBonus',
+        advanced: true,
         label: 'THG-Quote pro Jahr',
         unit: 'EUR',
         type: 'number',
@@ -207,9 +222,10 @@ export const steps = [
         step: 5,
         hint: 'Jährlich handelbare Treibhausgasminderungsquote.',
       },
-      { path: 'ev.tax', label: 'Kfz-Steuer E-Auto pro Jahr', unit: 'EUR', type: 'number', min: 0, max: 1000, step: 5, hint: 'Für reine E-Autos in Deutschland derzeit befristet 0 EUR.' },
+      { path: 'ev.tax', advanced: true, label: 'Kfz-Steuer E-Auto pro Jahr', unit: 'EUR', type: 'number', min: 0, max: 1000, step: 5, hint: 'Für reine E-Autos in Deutschland derzeit befristet 0 EUR.' },
       {
         path: 'ev.maintenanceFactor',
+        advanced: true,
         label: 'Wartungskosten gegenüber heute',
         unit: '%',
         type: 'percent',
@@ -221,6 +237,7 @@ export const steps = [
       },
       {
         path: 'ev.insuranceFactor',
+        advanced: true,
         label: 'Versicherung gegenüber heute',
         unit: '%',
         type: 'percent',
@@ -232,6 +249,7 @@ export const steps = [
       },
       {
         path: 'ev.depreciationRate',
+        advanced: true,
         label: 'Jährlicher Wertverlust E-Auto',
         unit: '%',
         type: 'percent',
@@ -242,6 +260,7 @@ export const steps = [
       },
       {
         path: 'ev.capitalCostRate',
+        advanced: true,
         label: 'Kapitalkosten pro Jahr',
         unit: '%',
         type: 'percent',
@@ -255,12 +274,15 @@ export const steps = [
   {
     id: 'bedarf',
     title: 'Anforderungen',
+    short: 'Bedarf',
+    advancedTitle: 'Weitere Anforderungen',
     lead: 'Harte Kriterien schließen ungeeignete Fahrzeuge aus, weiche fließen in die Bewertung ein.',
     fields: [
       { path: 'needs.budget', label: 'Budget (Listenpreis)', unit: 'EUR', type: 'number', min: 10000, max: 150000, step: 500 },
       { path: 'needs.seats', label: 'Benötigte Sitzplätze', unit: '', type: 'number', min: 2, max: 9, step: 1 },
       {
         path: 'needs.towing',
+        advanced: true,
         label: 'Anhängelast gebremst',
         unit: 'kg',
         type: 'number',
@@ -271,6 +293,7 @@ export const steps = [
       },
       {
         path: 'needs.minRangeKm',
+        advanced: true,
         label: 'Mindestreichweite WLTP',
         unit: 'km',
         type: 'number',
@@ -279,7 +302,7 @@ export const steps = [
         step: 25,
         hint: 'Optional. Der Rechner leitet den Bedarf sonst aus dem Fahrprofil ab.',
       },
-      { path: 'needs.minBootLiters', label: 'Mindest-Kofferraum', unit: 'l', type: 'number', min: 0, max: 1200, step: 25 },
+      { path: 'needs.minBootLiters', advanced: true, label: 'Mindest-Kofferraum', unit: 'l', type: 'number', min: 0, max: 1200, step: 25 },
       {
         path: 'needs.bodyPreference',
         label: 'Bevorzugte Karosserieformen',
@@ -296,6 +319,7 @@ export const steps = [
       },
       {
         path: 'needs.fastChargeImportant',
+        advanced: true,
         label: 'Schnelles Laden ist mir wichtig',
         type: 'checkbox',
         hint: 'Gewichtet die Ladeleistung stärker im Gesamtscore.',

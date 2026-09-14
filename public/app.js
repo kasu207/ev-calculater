@@ -4,7 +4,7 @@
  */
 
 import { steps, replacementFields, pricePresets } from './fields.js';
-import { money, moneyExact, signedMoney, number, decimal, duration, km } from './format.js';
+import { money, moneyExact, signedMoney, number, decimal, duration, durationAfter, km } from './format.js';
 import { renderCostLineChart, renderAnnualBars, renderScoreMeter } from './charts.js';
 
 const STORAGE_KEY = 'ev-calculator-input-v1';
@@ -19,6 +19,8 @@ const state = {
   detail: null,
   selectedComparison: null,
   pending: false,
+  // Welche Feinwert-Bereiche offen sind, überlebt ein Neuzeichnen des Formulars.
+  openAdvanced: new Set(),
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -141,12 +143,20 @@ function renderField(field) {
       </div>`;
   }
 
+  // Minus und Plus daneben: auf dem Telefon die schnellste Art, einen Wert
+  // zu korrigieren. Die Tastatur bleibt aussen vor, der Fokus im Feld.
   return `<div class="field">
       <label for="${id}">${escapeHtml(field.label)}</label>
-      <div class="field__input">
-        <input type="number" id="${id}" data-path="${field.path}" data-kind="${kind}"
-          min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" inputmode="decimal"${describedBy} />
-        ${unit}
+      <div class="numberbox">
+        <button type="button" class="numberbox__step" data-step-for="${id}" data-dir="-1"
+          tabindex="-1" aria-label="${escapeHtml(field.label)}: Wert verringern">&minus;</button>
+        <div class="field__input">
+          <input type="number" id="${id}" data-path="${field.path}" data-kind="${kind}"
+            min="${field.min}" max="${field.max}" step="${field.step}" value="${value}" inputmode="decimal"${describedBy} />
+          ${unit}
+        </div>
+        <button type="button" class="numberbox__step" data-step-for="${id}" data-dir="1"
+          tabindex="-1" aria-label="${escapeHtml(field.label)}: Wert erhöhen">+</button>
       </div>
       ${hint}
     </div>`;
@@ -222,27 +232,41 @@ function pricesBlock() {
     </div>`;
 }
 
+/**
+ * Feinwerte eines Schritts. Sie stehen eingeklappt unter den Hauptfeldern,
+ * damit ein Schritt auf dem Telefon in wenige Bildschirmhöhen passt.
+ */
+function advancedBlock(step, fields) {
+  return `<details class="advanced" data-advanced="${escapeHtml(step.id)}" ${state.openAdvanced.has(step.id) ? 'open' : ''}>
+      <summary>
+        <span>${escapeHtml(step.advancedTitle || 'Feinere Annahmen')}</span>
+        <span class="advanced__count">${fields.length} Werte</span>
+      </summary>
+      <div class="grid">${fields.map(renderField).join('')}</div>
+    </details>`;
+}
+
 function renderWizard() {
   const form = $('#wizard');
   form.innerHTML = steps
     .map((step, index) => {
-      const body = step.fields.map(renderField).join('');
+      const primary = step.fields.filter((f) => !f.advanced);
+      const advanced = step.fields.filter((f) => f.advanced);
       const extra = step.id === 'auto' ? scenarioBlock() : step.id === 'strom' ? pricesBlock() : '';
       return `<section class="step-panel" data-step="${index}" ${index === state.step ? '' : 'hidden'}>
           <header class="step-panel__head">
-            <p class="step-panel__count">Schritt ${index + 1} von ${steps.length}</p>
             <h2>${escapeHtml(step.title)}</h2>
             <p class="step-panel__lead">${escapeHtml(step.lead)}</p>
           </header>
           ${extra}
-          <div class="grid">${body}</div>
+          <div class="grid">${primary.map(renderField).join('')}</div>
+          ${advanced.length ? advancedBlock(step, advanced) : ''}
         </section>`;
     })
     .join('');
 
   renderStepper();
-  $('#prevBtn').disabled = state.step === 0;
-  $('#nextBtn').textContent = state.step === steps.length - 1 ? 'Ergebnis anzeigen' : 'Weiter';
+  syncNav();
 }
 
 function renderStepper() {
@@ -250,27 +274,57 @@ function renderStepper() {
     .map(
       (step, i) => `<li>
         <button type="button" class="stepper__btn ${i === state.step ? 'is-active' : ''} ${i < state.step ? 'is-done' : ''}"
-          data-goto="${i}" aria-current="${i === state.step ? 'step' : 'false'}">
+          data-goto="${i}" aria-current="${i === state.step ? 'step' : 'false'}"
+          aria-label="Schritt ${i + 1}: ${escapeHtml(step.title)}">
           <span class="stepper__num">${i + 1}</span>
-          <span class="stepper__label">${escapeHtml(step.title)}</span>
+          <span class="stepper__label">${escapeHtml(step.short || step.title)}</span>
         </button>
       </li>`,
     )
     .join('');
+
+  const current = steps[state.step];
+  const percent = Math.round(((state.step + 1) / steps.length) * 100);
+  $('#stepCount').textContent = `Schritt ${state.step + 1} von ${steps.length}`;
+  $('#progressBar').style.width = `${percent}%`;
+  const progress = $('#progress');
+  progress.setAttribute('aria-valuenow', String(percent));
+  progress.setAttribute('aria-valuetext', `Schritt ${state.step + 1} von ${steps.length}: ${current.title}`);
 }
 
-function goToStep(index) {
+/** Beschriftung und Zustand der Leiste unten. */
+function syncNav() {
+  $('#prevBtn').disabled = state.step === 0;
+  $('#nextLabel').textContent = state.step === steps.length - 1 ? 'Ergebnis anzeigen' : 'Weiter';
+}
+
+function scrollToEl(el) {
+  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function goToStep(index, { scroll = true } = {}) {
   state.step = Math.max(0, Math.min(steps.length - 1, index));
   document.querySelectorAll('.step-panel').forEach((panel) => {
     panel.hidden = Number(panel.dataset.step) !== state.step;
   });
   renderStepper();
-  $('#prevBtn').disabled = state.step === 0;
-  $('#nextBtn').textContent = state.step === steps.length - 1 ? 'Ergebnis anzeigen' : 'Weiter';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  syncNav();
+  // Zum Schrittanfang statt zum Seitenanfang: der Kopfbereich muss nicht
+  // jedes Mal erneut überscrollt werden.
+  if (scroll) scrollToEl($('#wizardShell'));
 }
 
 /* --------------------------------------------------------------- Ergebnis */
+
+/**
+ * Einheitliche Sprachregelung für den Break-even. Null Monate heisst: der
+ * Vorteil steht von Beginn an - das ist kein "Break-even nach 0 Monaten".
+ */
+function breakEvenPhrase(c) {
+  if (c.breakEvenYears === null) return `Kein Break-even in ${c.years} Jahren`;
+  if (c.breakEvenMonths === 0) return 'Im Vorteil ab dem ersten Tag';
+  return `Break-even nach ${durationAfter(c.breakEvenYears)}`;
+}
 
 function verdict(result, selected) {
   const best = selected || result.bestMatch;
@@ -279,6 +333,7 @@ function verdict(result, selected) {
       tone: 'warn',
       title: 'Kein Fahrzeug erfüllt Ihre harten Kriterien',
       text: 'Bitte Budget, Sitzplätze oder Anhängelast in Schritt 4 anpassen.',
+      figure: null,
     };
   }
   const c = best.comparison;
@@ -286,29 +341,40 @@ function verdict(result, selected) {
     const alt = result.bestEconomy;
     const altHint =
       alt && alt.vehicle.id !== best.vehicle.id && alt.comparison.breakEvenYears !== null
-        ? ` Am ehesten rechnet sich der ${alt.label}: Break-even nach ${duration(alt.comparison.breakEvenYears)}.`
+        ? ` Am ehesten rechnet sich der ${alt.label}: Break-even nach ${durationAfter(alt.comparison.breakEvenYears)}.`
         : ' Länger fahren, günstiger laden oder das Szenario "Neuwagen steht an" prüfen kehrt das Bild meist um.';
     return {
       tone: 'warn',
       title: `Innerhalb von ${c.years} Jahren rechnet sich der Umstieg nicht`,
       text: `Nach ${c.years} Jahren fehlen rund ${money(Math.abs(c.totalAdvantage))}. Der größte Posten ist der Wertverlust des Neuwagens.${altHint}`,
+      figure: { value: `über ${c.years} Jahre`, label: 'kein Break-even im Zeitraum' },
+    };
+  }
+  if (c.breakEvenMonths === 0) {
+    return {
+      tone: 'good',
+      title: 'Ja - der Umstieg lohnt sich vom ersten Tag an',
+      text: `Förderung und laufende Ersparnis tragen den Mehrpreis von Beginn an. Nach ${c.years} Jahren steht ein Vorteil von ${money(c.totalAdvantage)}.`,
+      figure: { value: 'sofort', label: 'im Vorteil ab dem ersten Tag' },
     };
   }
   if (c.breakEvenYears <= c.years * 0.5) {
     return {
       tone: 'good',
-      title: `Ja - ab ${duration(c.breakEvenYears)} fahren Sie günstiger`,
+      title: `Ja - ab ${durationAfter(c.breakEvenYears)} fahren Sie günstiger`,
       text: `Das entspricht rund ${km(c.breakEvenKm)} Fahrleistung. Danach sparen Sie ${
         c.prices.escalating
           ? `laufend ${money(c.annual.savingsFirstYear)} im ersten und ${money(c.annual.savingsLastYear)} im letzten Jahr`
           : `jedes Jahr etwa ${money(c.annual.savings)}`
       }.`,
+      figure: { value: duration(c.breakEvenYears), label: `bis zum Break-even, rund ${km(c.breakEvenKm)}` },
     };
   }
   return {
     tone: 'ok',
-    title: `Ja, aber erst nach ${duration(c.breakEvenYears)}`,
+    title: `Ja, aber erst nach ${durationAfter(c.breakEvenYears)}`,
     text: `Der Umstieg lohnt sich, wenn Sie das Fahrzeug mindestens ${Math.ceil(c.breakEvenYears)} Jahre behalten (rund ${km(c.breakEvenKm)}).`,
+    figure: { value: duration(c.breakEvenYears), label: `bis zum Break-even, rund ${km(c.breakEvenKm)}` },
   };
 }
 
@@ -318,7 +384,12 @@ function statTiles(c) {
     {
       label: 'Break-even erreicht nach',
       value: c.breakEvenYears === null ? 'nicht im Zeitraum' : duration(c.breakEvenYears),
-      note: c.breakEvenKm === null ? `länger als ${c.years} Jahre` : `entspricht ${km(c.breakEvenKm)}`,
+      note:
+        c.breakEvenYears === null
+          ? `länger als ${c.years} Jahre`
+          : c.breakEvenMonths === 0
+            ? 'Förderung trägt den Mehrpreis von Beginn an'
+            : `entspricht ${km(c.breakEvenKm)}`,
     },
     {
       label: 'Laufende Ersparnis im ersten Jahr',
@@ -402,11 +473,7 @@ function rankingList(result) {
               <span class="card-vehicle__scorenum">${decimal(r.score)} / 100</span>
             </span>
             <span class="card-vehicle__break">
-              ${
-                c.breakEvenYears === null
-                  ? `<span class="neg">Kein Break-even in ${c.years} Jahren</span>`
-                  : `<span class="pos">Break-even nach ${duration(c.breakEvenYears)}</span>`
-              }
+              <span class="${c.breakEvenYears === null ? 'neg' : 'pos'}">${escapeHtml(breakEvenPhrase(c))}</span>
               <span class="muted">${signedMoney(c.annual.savingsFirstYear)} laufend im 1. Jahr</span>
             </span>
           </button>
@@ -560,11 +627,7 @@ function renderResult() {
       ? `<p class="note note--counter">
            Zum Vergleich im Szenario
            <strong>${counter.scenario === 'replace' ? 'Neuwagen steht an' : 'Auto behalten'}</strong>:
-           ${
-             counter.breakEvenYears === null
-               ? `kein Break-even innerhalb des Zeitraums (${signedMoney(counter.totalAdvantage)}).`
-               : `Break-even nach ${duration(counter.breakEvenYears)} (${signedMoney(counter.totalAdvantage)}).`
-           }
+           ${escapeHtml(breakEvenPhrase(counter))} (${signedMoney(counter.totalAdvantage)}).
          </p>`
       : '';
 
@@ -578,17 +641,28 @@ function renderResult() {
     </div>
 
     <div class="verdict verdict--${v.tone}">
-      <p class="verdict__title">${escapeHtml(v.title)}</p>
-      <p class="verdict__text">${escapeHtml(v.text)}</p>
+      <div class="verdict__body">
+        <p class="eyebrow">${escapeHtml(result.scenario === 'replace' ? 'Neuwagen steht an' : 'Auto behalten')}</p>
+        <p class="verdict__title">${escapeHtml(v.title)}</p>
+        <p class="verdict__text">${escapeHtml(v.text)}</p>
+        ${
+          best && isRecommended
+            ? `<p class="verdict__pick">Empfohlenes Fahrzeug: <strong>${escapeHtml(best.label)}</strong> &middot; ${money(best.vehicle.price)} Listenpreis</p>`
+            : best
+              ? `<p class="verdict__pick">Angezeigt: <strong>${escapeHtml(best.label)}</strong> &middot; ${money(best.vehicle.price)} Listenpreis.
+                 Beste Gesamtempfehlung bleibt der ${escapeHtml(recommended.label)}.</p>`
+              : ''
+        }
+        ${counterHint}
+      </div>
       ${
-        best && isRecommended
-          ? `<p class="verdict__pick">Empfohlenes Fahrzeug: <strong>${escapeHtml(best.label)}</strong> &middot; ${money(best.vehicle.price)} Listenpreis</p>`
-          : best
-            ? `<p class="verdict__pick">Angezeigt: <strong>${escapeHtml(best.label)}</strong> &middot; ${money(best.vehicle.price)} Listenpreis.
-               Beste Gesamtempfehlung bleibt der ${escapeHtml(recommended.label)}.</p>`
-            : ''
+        v.figure
+          ? `<div class="verdict__figure">
+               <span class="verdict__value">${escapeHtml(v.figure.value)}</span>
+               <span class="verdict__figure-label">${escapeHtml(v.figure.label)}</span>
+             </div>`
+          : ''
       }
-      ${counterHint}
     </div>
 
     ${best ? statTiles(best.comparison) : ''}
@@ -617,7 +691,7 @@ function renderResult() {
         : ''
     }
 
-    <section class="panel">
+    <section class="panel" id="vehiclePanel">
       <div class="panel__head">
         <div>
           <h3>Passende E-Autos</h3>
@@ -655,19 +729,34 @@ function renderDetailPanel() {
   if (state.detail) renderAnnualBars($('#annualChart'), state.detail.evaluation.comparison);
 }
 
-let resultObserver = null;
+let barFrame = 0;
 
-/** Die schwebende Leiste verschwindet, sobald das Ergebnis selbst im Bild ist. */
-function observeResultVisibility() {
-  const target = $('#result');
+/**
+ * Die Leiste unten zeigt, was gerade gebraucht wird: über dem Formular den
+ * Zwischenstand und die Schritt-Navigation, ab dem Ergebnis den Weg zurück zu
+ * den Angaben und zur Fahrzeugliste. Gemessen wird an der Scrollposition und
+ * nicht nur an der Sichtbarkeit, damit die Leiste auch unterhalb des
+ * Ergebnisses - etwa im Fußbereich - richtig steht.
+ */
+function syncActionBar() {
+  const result = $('#result');
   const bar = $('#livebar');
-  if (!target || !bar || typeof IntersectionObserver === 'undefined') return;
-  resultObserver?.disconnect();
-  resultObserver = new IntersectionObserver(
-    ([entry]) => bar.classList.toggle('livebar--hidden', entry.isIntersecting),
-    { threshold: 0.08 },
-  );
-  resultObserver.observe(target);
+  const wizardNav = $('#wizardNav');
+  const resultNav = $('#resultNav');
+  if (!result || !bar || !wizardNav || !resultNav) return;
+
+  const inResult = !result.hidden && result.getBoundingClientRect().top < window.innerHeight * 0.55;
+  bar.classList.toggle('livebar--hidden', inResult);
+  wizardNav.hidden = inResult;
+  resultNav.hidden = !inResult;
+}
+
+function scheduleBarSync() {
+  if (barFrame) return;
+  barFrame = requestAnimationFrame(() => {
+    barFrame = 0;
+    syncActionBar();
+  });
 }
 
 function renderLivebar() {
@@ -682,11 +771,9 @@ function renderLivebar() {
   bar.innerHTML = `<button type="button" class="livebar__btn" id="livebarBtn">
       <span class="livebar__label">Aktuelle Empfehlung</span>
       <span class="livebar__vehicle">${escapeHtml(best.label)}</span>
-      <span class="livebar__break">${
-        c.breakEvenYears === null ? `kein Break-even in ${c.years} Jahren` : `Break-even nach ${duration(c.breakEvenYears)}`
-      }</span>
+      <span class="livebar__break">${escapeHtml(breakEvenPhrase(c))}</span>
     </button>`;
-  observeResultVisibility();
+  syncActionBar();
 }
 
 /* ------------------------------------------------------------ Berechnung */
@@ -813,6 +900,32 @@ function bindEvents() {
   });
 
   form.addEventListener('click', (event) => {
+    // Minus/Plus am Zahlenfeld: Wert um eine Schrittweite verschieben und das
+    // normale input-Ereignis auslösen, damit die Neuberechnung anläuft.
+    const stepBtn = event.target.closest('[data-step-for]');
+    if (stepBtn) {
+      const input = document.getElementById(stepBtn.dataset.stepFor);
+      if (input) {
+        const step = Number(input.step) || 1;
+        const min = input.min === '' ? -Infinity : Number(input.min);
+        const max = input.max === '' ? Infinity : Number(input.max);
+        const decimals = (String(step).split('.')[1] || '').length;
+        const next = (Number(input.value) || 0) + Number(stepBtn.dataset.dir) * step;
+        input.value = String(Math.min(max, Math.max(min, Number(next.toFixed(decimals)))));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return;
+    }
+
+    // Offener Klappbereich bleibt offen, auch wenn das Formular neu entsteht.
+    const summary = event.target.closest('.advanced > summary');
+    if (summary) {
+      const id = summary.parentElement.dataset.advanced;
+      if (summary.parentElement.open) state.openAdvanced.delete(id);
+      else state.openAdvanced.add(id);
+      return;
+    }
+
     const presetBtn = event.target.closest('[data-price-preset]');
     if (presetBtn) {
       const preset = pricePresets.find((item) => item.id === presetBtn.dataset.pricePreset);
@@ -820,7 +933,7 @@ function bindEvents() {
         Object.assign(state.input.prices, preset.values);
         const activeStep = state.step;
         renderWizard();
-        goToStep(activeStep);
+        goToStep(activeStep, { scroll: false });
         recompute();
       }
       return;
@@ -831,7 +944,7 @@ function bindEvents() {
     state.input.scenario = btn.dataset.scenario;
     const activeStep = state.step;
     renderWizard();
-    goToStep(activeStep);
+    goToStep(activeStep, { scroll: false });
     recompute();
   });
 
@@ -843,18 +956,25 @@ function bindEvents() {
   $('#prevBtn').addEventListener('click', () => goToStep(state.step - 1));
   $('#nextBtn').addEventListener('click', () => {
     if (state.step === steps.length - 1) {
-      recompute().then(() => $('#result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      recompute().then(() => scrollToEl($('#result')));
       return;
     }
     goToStep(state.step + 1);
   });
+
+  // Der Rechner ist von Beginn an mit realistischen Werten belegt. Wer will,
+  // springt deshalb sofort zum Ergebnis und verfeinert erst danach.
+  $('#startBtn').addEventListener('click', () => goToStep(0));
+  $('#quickResultBtn').addEventListener('click', () => scrollToEl($('#result')));
+  $('#editBtn').addEventListener('click', () => scrollToEl($('#wizardShell')));
+  $('#vehiclesBtn').addEventListener('click', () => scrollToEl($('#vehiclePanel') || $('#result')));
 
   $('#result').addEventListener('click', async (event) => {
     const scenarioBtn = event.target.closest('[data-scenario]');
     if (scenarioBtn) {
       state.input.scenario = scenarioBtn.dataset.scenario;
       renderWizard();
-      goToStep(state.step);
+      goToStep(state.step, { scroll: false });
       await recompute();
       return;
     }
@@ -896,9 +1016,21 @@ function bindEvents() {
     }
   });
 
-  $('#livebar').addEventListener('click', () => {
-    $('#result')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+  $('#livebar').addEventListener('click', () => scrollToEl($('#result')));
+
+  // Der Kopfbereich bekommt erst beim Scrollen eine Trennlinie.
+  const header = document.querySelector('.site-header');
+  const syncHeader = () => header.classList.toggle('is-stuck', window.scrollY > 8);
+  window.addEventListener(
+    'scroll',
+    () => {
+      syncHeader();
+      scheduleBarSync();
+    },
+    { passive: true },
+  );
+  window.addEventListener('resize', scheduleBarSync, { passive: true });
+  syncHeader();
 
   $('#resetBtn').addEventListener('click', async () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -906,6 +1038,7 @@ function bindEvents() {
     state.input = structuredClone(meta.defaults);
     state.selectedVehicleId = null;
     state.detail = null;
+    state.openAdvanced.clear();
     renderWizard();
     goToStep(0);
     recompute({ keepSelection: false });
@@ -931,8 +1064,12 @@ function bindEvents() {
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   const btn = $('#themeToggle');
-  btn.textContent = theme === 'dark' ? 'Helles Design' : 'Dunkles Design';
+  const label = theme === 'dark' ? 'Helles Design einschalten' : 'Dunkles Design einschalten';
+  btn.setAttribute('aria-label', label);
+  btn.setAttribute('title', label);
   btn.setAttribute('aria-pressed', String(theme === 'dark'));
+  // Auch die Systemleiste mobiler Browser folgt dem Modus.
+  $('#themeColor')?.setAttribute('content', theme === 'dark' ? '#000000' : '#f5f5f7');
 }
 
 /* -------------------------------------------------------------------- Start */
@@ -951,6 +1088,10 @@ async function init() {
     state.input = restore(meta.defaults);
     const vintage = $('#dataVintage');
     if (vintage) vintage.textContent = `${meta.dataVintage}, ${meta.vehicleCount} Modelle`;
+    const heroModels = $('#heroModels');
+    if (heroModels) heroModels.textContent = `${meta.vehicleCount} Modelle`;
+    const heroVintage = $('#heroVintage');
+    if (heroVintage) heroVintage.textContent = meta.dataVintage;
   } catch (err) {
     document.querySelector('main').insertAdjacentHTML(
       'afterbegin',
