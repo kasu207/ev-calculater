@@ -99,11 +99,89 @@ mit Begründung.
 ```bash
 npm start          # http://localhost:3000
 npm run dev        # mit automatischem Neustart
-npm test           # 27 Tests des Rechenkerns
+npm test           # 35 Tests: Rechenkern und HTTP-Schicht
 ```
 
 Port und Adresse sind über `PORT` und `HOST` einstellbar. Es werden keine Pakete
 installiert – Node 18 oder neuer genügt.
+
+## Deployment mit Docker Compose
+
+Auf dem Server läuft die Anwendung auf **Port 7000**; im Container lauscht sie
+intern auf 3000.
+
+```bash
+git clone https://github.com/kasu207/ev-calculater.git
+cd ev-calculater
+docker compose up -d --build
+```
+
+Prüfen, ob sie steht:
+
+```bash
+docker compose ps                       # Status muss "healthy" zeigen
+curl http://localhost:7000/api/health   # {"status":"ok",...}
+```
+
+Danach ist der Rechner unter `http://<server>:7000` erreichbar.
+
+### Bind-Adresse
+
+Standardmäßig bindet der Port auf alle Schnittstellen. Hinter einem Reverse Proxy
+ist es besser, ihn nur lokal zu öffnen:
+
+```bash
+BIND_ADDR=127.0.0.1 docker compose up -d
+```
+
+### Betrieb hinter einem Reverse Proxy
+
+Der Server spricht reines HTTP ohne eigene TLS-Terminierung. Für eine öffentliche
+Adresse gehört ein Proxy davor, der das Zertifikat hält. Mit Caddy genügt:
+
+```caddyfile
+rechner.example.com {
+    reverse_proxy 127.0.0.1:7000
+}
+```
+
+Mit nginx:
+
+```nginx
+location / {
+    proxy_pass         http://127.0.0.1:7000;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+}
+```
+
+### Aktualisieren, Logs, Stoppen
+
+```bash
+git pull && docker compose up -d --build   # neue Version ausrollen
+docker compose logs -f                     # Logs mitlesen
+docker compose down                        # stoppen und entfernen
+```
+
+Der Container fährt auf SIGTERM geordnet herunter (gemessen rund 0,1 Sekunden),
+`docker compose down` läuft also ohne Timeout durch.
+
+### Was der Container mitbringt
+
+| Eigenschaft | Umsetzung |
+| --- | --- |
+| Basis | `node:22-alpine`, keine Laufzeitabhängigkeiten, kein Build-Schritt |
+| Nutzer | unprivilegierter Nutzer `node`, nicht root |
+| Dateisystem | `read_only: true` – die Anwendung schreibt nichts auf die Platte |
+| Rechte | `cap_drop: ALL`, `no-new-privileges` |
+| Grenzen | 256 MB Speicher, 1 CPU |
+| Healthcheck | `GET /api/health` alle 30 Sekunden |
+| Logs | json-file, rotiert bei 10 MB, 3 Dateien |
+| Neustart | `unless-stopped` |
+
+Es gibt keinen Zustand und keine Datenbank: Eingaben bleiben im Browser des
+Nutzers, der Container ist jederzeit ersetzbar.
 
 ## API
 
@@ -135,6 +213,8 @@ shared/      Rechenkern – von Server und Tests gemeinsam genutzt
 server/      HTTP-Server und API, ohne Fremdbibliotheken
 public/      Frontend (ES-Module, SVG-Diagramme ohne Chartbibliothek)
 test/        Tests mit dem Node-Testrunner
+Dockerfile
+docker-compose.yml
 ```
 
 ## Barrierefreiheit und Darstellung

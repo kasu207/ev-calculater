@@ -1,0 +1,53 @@
+services:
+  ev-calculator:
+    build: .
+    image: ev-calculator:latest
+    container_name: ev-calculator
+
+    # Erreichbar auf Port 7000 des Hosts, intern lauscht der Server auf 3000.
+    # Hinter einem Reverse Proxy besser nur lokal binden:
+    #   BIND_ADDR=127.0.0.1 docker compose up -d
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:7000:3000"
+
+    restart: unless-stopped
+
+    # Räumt Zombie-Prozesse ab und reicht Signale sauber an Node durch.
+    init: true
+
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+      TZ: Europe/Berlin
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+    # Die Anwendung schreibt nichts auf die Platte und speichert keine
+    # Nutzerdaten - ein schreibgeschütztes Dateisystem kostet hier nichts.
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "1.0"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -85,6 +85,17 @@ function serializeEvaluation(result) {
 }
 
 const routes = {
+  /**
+   * Lebenszeichen für Container-Healthchecks und Reverse Proxies.
+   * Bewusst billig: keine Berechnung, nur ein Beleg, dass der Prozess
+   * Anfragen beantwortet und die Fahrzeugdaten geladen sind.
+   */
+  'GET /api/health': async () => ({
+    status: 'ok',
+    uptimeSeconds: Math.round(process.uptime()),
+    vehicleCount: vehicles.length,
+  }),
+
   'GET /api/meta': async () => ({
     defaults,
     bodyLabels: BODY_LABELS,
@@ -189,9 +200,24 @@ export const server = http.createServer(async (req, res) => {
   await serveStatic(req, res, url.pathname);
 });
 
+/**
+ * Geordnetes Herunterfahren. Ohne das würde der Prozess im Container das
+ * SIGTERM von `docker compose down` ignorieren und erst nach dem Timeout
+ * hart abgeräumt - das kostet bei jedem Neustart unnötig Sekunden.
+ */
+export function shutdown(signal) {
+  console.log(`${signal} empfangen, Server wird beendet.`);
+  server.close(() => process.exit(0));
+  // Notbremse, falls eine Verbindung nicht freigibt.
+  setTimeout(() => process.exit(0), 10000).unref();
+}
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   server.listen(PORT, HOST, () => {
-    console.log(`E-Auto-Rechner läuft auf http://localhost:${PORT}`);
+    console.log(`E-Auto-Rechner läuft auf http://${HOST}:${PORT}`);
   });
+  for (const signal of ['SIGTERM', 'SIGINT']) {
+    process.on(signal, () => shutdown(signal));
+  }
 }
