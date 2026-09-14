@@ -3,7 +3,7 @@
  * Backend befragen und Ergebnis darstellen.
  */
 
-import { steps, replacementFields } from './fields.js';
+import { steps, replacementFields, pricePresets } from './fields.js';
 import { money, moneyExact, signedMoney, number, decimal, duration, km } from './format.js';
 import { renderCostLineChart, renderAnnualBars, renderScoreMeter } from './charts.js';
 
@@ -181,12 +181,53 @@ function scenarioBlock() {
     </div>`;
 }
 
+function activePricePreset() {
+  const current = state.input.prices || {};
+  return pricePresets.find(
+    (preset) =>
+      Math.abs(preset.values.fuelGrowth - (current.fuelGrowth ?? 0)) < 1e-9 &&
+      Math.abs(preset.values.electricityGrowth - (current.electricityGrowth ?? 0)) < 1e-9,
+  );
+}
+
+/** Hebt nach einer Direkteingabe die passende Voreinstellung hervor. */
+function syncPricePresetState() {
+  const active = activePricePreset();
+  document.querySelectorAll('[data-price-preset]').forEach((btn) => {
+    const on = active?.id === btn.dataset.pricePreset;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-checked', String(on));
+  });
+}
+
+function pricesBlock() {
+  const active = activePricePreset();
+  return `<div class="scenario">
+      <h3>Wie entwickeln sich die Energiepreise?</h3>
+      <div class="segmented" role="radiogroup" aria-label="Preisprognose">
+        ${pricePresets
+          .map(
+            (preset) => `<button type="button" role="radio" aria-checked="${active?.id === preset.id}"
+              class="segmented__btn ${active?.id === preset.id ? 'is-active' : ''}" data-price-preset="${escapeHtml(preset.id)}">
+              <strong>${escapeHtml(preset.label)}</strong>
+              <small>${escapeHtml(preset.hint)}</small>
+            </button>`,
+          )
+          .join('')}
+      </div>
+      <p class="scenario__note">
+        Die Rechnung läuft in heutigen Euro. Tragen Sie deshalb reale Steigerungen ein, also den
+        Anteil über der allgemeinen Inflation. Eigene Werte überschreiben die Voreinstellung.
+      </p>
+    </div>`;
+}
+
 function renderWizard() {
   const form = $('#wizard');
   form.innerHTML = steps
     .map((step, index) => {
       const body = step.fields.map(renderField).join('');
-      const extra = step.id === 'auto' ? scenarioBlock() : '';
+      const extra = step.id === 'auto' ? scenarioBlock() : step.id === 'strom' ? pricesBlock() : '';
       return `<section class="step-panel" data-step="${index}" ${index === state.step ? '' : 'hidden'}>
           <header class="step-panel__head">
             <p class="step-panel__count">Schritt ${index + 1} von ${steps.length}</p>
@@ -257,7 +298,11 @@ function verdict(result, selected) {
     return {
       tone: 'good',
       title: `Ja - ab ${duration(c.breakEvenYears)} fahren Sie günstiger`,
-      text: `Das entspricht rund ${km(c.breakEvenKm)} Fahrleistung. Danach sparen Sie jedes Jahr etwa ${money(c.annual.savings)}.`,
+      text: `Das entspricht rund ${km(c.breakEvenKm)} Fahrleistung. Danach sparen Sie ${
+        c.prices.escalating
+          ? `laufend ${money(c.annual.savingsFirstYear)} im ersten und ${money(c.annual.savingsLastYear)} im letzten Jahr`
+          : `jedes Jahr etwa ${money(c.annual.savings)}`
+      }.`,
     };
   }
   return {
@@ -268,6 +313,7 @@ function verdict(result, selected) {
 }
 
 function statTiles(c) {
+  const escalating = c.prices.escalating;
   const tiles = [
     {
       label: 'Break-even erreicht nach',
@@ -275,9 +321,11 @@ function statTiles(c) {
       note: c.breakEvenKm === null ? `länger als ${c.years} Jahre` : `entspricht ${km(c.breakEvenKm)}`,
     },
     {
-      label: 'Laufende Ersparnis pro Jahr',
-      value: signedMoney(c.annual.savings),
-      note: `${money(c.annual.ice.total)} statt ${money(c.annual.ev.total)}`,
+      label: 'Laufende Ersparnis im ersten Jahr',
+      value: signedMoney(c.annual.savingsFirstYear),
+      note: escalating
+        ? `wächst auf ${signedMoney(c.annual.savingsLastYear)} im Jahr ${c.years}, im Mittel ${signedMoney(c.annual.savingsAverage)}`
+        : `${money(c.annual.ice.total)} statt ${money(c.annual.ev.total)}`,
     },
     {
       label: `Vorteil nach ${c.years} Jahren`,
@@ -288,6 +336,15 @@ function statTiles(c) {
       label: 'Energiekosten je 100 km',
       value: moneyExact(c.costPer100Ev),
       note: `Verbrenner ${moneyExact(c.costPer100Ice)} - Mischpreis ${decimal(c.kwhPrice * 100)} ct/kWh`,
+    },
+    {
+      label: 'Angenommene Preisentwicklung',
+      value: escalating
+        ? `${decimal(c.prices.fuelGrowth * 100)} / ${decimal(c.prices.electricityGrowth * 100)} %`
+        : 'real konstant',
+      note: escalating
+        ? `${moneyExact(c.prices.fuelToday)} auf ${moneyExact(c.prices.fuelAtEnd)} je Liter, ${decimal(c.prices.kwhToday * 100)} auf ${decimal(c.prices.kwhAtEnd * 100)} ct/kWh`
+        : 'Kraftstoff und Strom steigen nur mit der allgemeinen Inflation',
     },
   ];
   return `<div class="tiles">${tiles
@@ -350,7 +407,7 @@ function rankingList(result) {
                   ? `<span class="neg">Kein Break-even in ${c.years} Jahren</span>`
                   : `<span class="pos">Break-even nach ${duration(c.breakEvenYears)}</span>`
               }
-              <span class="muted">${signedMoney(c.annual.savings)} pro Jahr laufend</span>
+              <span class="muted">${signedMoney(c.annual.savingsFirstYear)} laufend im 1. Jahr</span>
             </span>
           </button>
         </li>`;
@@ -463,13 +520,17 @@ function detailBlock() {
         </div>
       </div>
 
-      <h4>Jährliche Kosten im Vergleich</h4>
+      <h4>Jährliche Kosten im Vergleich - erstes Jahr</h4>
       <div class="legend">
         <span class="legend__item"><span class="swatch swatch--ev"></span>E-Auto</span>
         <span class="legend__item"><span class="swatch swatch--ice"></span>${escapeHtml(c.scenarioLabel)}</span>
       </div>
       <div class="chart-wrap" id="annualChart"></div>
-      <p class="note">Summe pro Jahr: E-Auto ${money(c.annual.ev.total)}, ${escapeHtml(c.scenarioLabel)} ${money(c.annual.ice.total)}. Einmalig kommen beim E-Auto ${money(c.evUpfront)} Anschaffung abzüglich Verkaufserlös hinzu.</p>
+      <p class="note">Summe im ersten Jahr: E-Auto ${money(c.annual.ev.total)}, ${escapeHtml(c.scenarioLabel)} ${money(c.annual.ice.total)}. Einmalig kommen beim E-Auto ${money(c.evUpfront)} Anschaffung abzüglich Verkaufserlös hinzu.${
+        c.prices.escalating
+          ? ` Durch die angenommene Preisentwicklung liegen die Energiekosten im Jahr ${c.years} bei ${money(c.annual.ice.fuel * (c.prices.fuelAtEnd / c.prices.fuelToday))} statt ${money(c.annual.ice.fuel)} für den Verbrenner und bei ${money(c.annual.ev.energy * (c.prices.kwhAtEnd / c.prices.kwhToday))} statt ${money(c.annual.ev.energy)} für das E-Auto.`
+          : ''
+      }</p>
 
       ${offersBlock(state.detail)}
     </div>`;
@@ -538,7 +599,11 @@ function renderResult() {
             <div class="panel__head">
               <div>
                 <h3>Wann holt der ${escapeHtml(best.label)} auf?</h3>
-                <p class="note">Kumulierte Gesamtkosten inklusive Wertverlust, Wallbox, Förderung und Kapitalkosten. Der Schnittpunkt ist der Break-even.</p>
+                <p class="note">Kumulierte Gesamtkosten inklusive Wertverlust, Wallbox, Förderung, Kapitalkosten und Preisentwicklung. Der Schnittpunkt ist der Break-even.${
+                  best.comparison.prices.escalating
+                    ? ` Angesetzt sind real ${decimal(best.comparison.prices.fuelGrowth * 100)} Prozent pro Jahr auf Kraftstoff und ${decimal(best.comparison.prices.electricityGrowth * 100)} Prozent auf Strom.`
+                    : ' Kraftstoff- und Strompreise sind real konstant angesetzt.'
+                }</p>
               </div>
               <button type="button" class="btn btn--ghost" id="toggleTable" aria-expanded="false">Als Tabelle</button>
             </div>
@@ -721,6 +786,8 @@ function bindEvents() {
 
     setPath(state.input, target.dataset.path, readControl(target));
 
+    if (target.dataset.path.startsWith('prices.')) syncPricePresetState();
+
     if (target.type === 'range') {
       const out = document.getElementById(`${target.id}-out`);
       if (out) {
@@ -746,6 +813,19 @@ function bindEvents() {
   });
 
   form.addEventListener('click', (event) => {
+    const presetBtn = event.target.closest('[data-price-preset]');
+    if (presetBtn) {
+      const preset = pricePresets.find((item) => item.id === presetBtn.dataset.pricePreset);
+      if (preset) {
+        Object.assign(state.input.prices, preset.values);
+        const activeStep = state.step;
+        renderWizard();
+        goToStep(activeStep);
+        recompute();
+      }
+      return;
+    }
+
     const btn = event.target.closest('[data-scenario]');
     if (!btn) return;
     state.input.scenario = btn.dataset.scenario;

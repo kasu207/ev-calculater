@@ -132,8 +132,8 @@ export const steps = [
   },
   {
     id: 'strom',
-    title: 'Strom und Laden',
-    lead: 'Der Ladepreis entscheidet über die laufende Ersparnis. Zu Hause laden ist meist halb so teuer wie Schnellladen.',
+    title: 'Energiepreise und Laden',
+    lead: 'Der Ladepreis entscheidet über die laufende Ersparnis. Zu Hause laden ist meist halb so teuer wie Schnellladen. Darunter legen Sie fest, wie sich Kraftstoff und Strom über den Betrachtungszeitraum entwickeln.',
     fields: [
       {
         path: 'ev.homeChargeShare',
@@ -156,6 +156,26 @@ export const steps = [
         max: 25,
         step: 1,
         hint: 'Differenz zwischen gezähltem Strom und dem, was in der Batterie ankommt.',
+      },
+      {
+        path: 'prices.fuelGrowth',
+        label: 'Preissteigerung Kraftstoff pro Jahr',
+        unit: '%',
+        type: 'percent',
+        min: -3,
+        max: 12,
+        step: 0.5,
+        hint: 'Real, also über die allgemeine Inflation hinaus. Wichtigster Treiber ist der steigende CO2-Preis.',
+      },
+      {
+        path: 'prices.electricityGrowth',
+        label: 'Preissteigerung Strom pro Jahr',
+        unit: '%',
+        type: 'percent',
+        min: -3,
+        max: 12,
+        step: 0.5,
+        hint: 'Real. Netzentgelte und Netzausbau wirken hier gegen die sinkenden Erzeugungskosten.',
       },
       {
         path: 'ev.wallboxCost',
@@ -300,4 +320,30 @@ export const replacementFields = [
   { path: 'replacement.tax', label: 'Kfz-Steuer pro Jahr', unit: 'EUR', type: 'number', min: 0, max: 2000, step: 5 },
   { path: 'replacement.maintenance', label: 'Wartung pro Jahr', unit: 'EUR', type: 'number', min: 0, max: 8000, step: 25 },
   { path: 'replacement.depreciationRate', label: 'Jährlicher Wertverlust', unit: '%', type: 'percent', min: 0, max: 35, step: 1 },
+];
+
+/**
+ * Voreinstellungen für die Preisprognose. Alle Werte real, also zusätzlich zur
+ * allgemeinen Inflation. Sie ersetzen keine Prognose, sondern machen die
+ * Bandbreite mit einem Klick durchspielbar.
+ */
+export const pricePresets = [
+  {
+    id: 'flat',
+    label: 'Preise bleiben real konstant',
+    hint: 'Kraftstoff und Strom steigen nur mit der allgemeinen Inflation.',
+    values: { fuelGrowth: 0, electricityGrowth: 0 },
+  },
+  {
+    id: 'moderate',
+    label: 'Moderat steigend',
+    hint: 'Kraftstoff 2,0 Prozent, Strom 1,0 Prozent pro Jahr real.',
+    values: { fuelGrowth: 0.02, electricityGrowth: 0.01 },
+  },
+  {
+    id: 'co2',
+    label: 'CO2-Preis schlägt durch',
+    hint: 'Kraftstoff 5,0 Prozent, Strom 1,0 Prozent pro Jahr real.',
+    values: { fuelGrowth: 0.05, electricityGrowth: 0.01 },
+  },
 ];

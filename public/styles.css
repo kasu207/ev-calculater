@@ -313,7 +313,7 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .verdict__text { color: var(--text-secondary); margin-bottom: 0.6rem; }
 .verdict__pick { margin: 0; }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.9rem; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.9rem; }
 .tile {
   background: var(--surface-0);
   border: 1px solid var(--border);

@@ -14,13 +14,17 @@
  * des E-Autos zum Zeitpunkt t (in Jahren):
  *
  *   vorteil(t) = förderung - wallbox
- *              + ersparnis_laufend * t
+ *              + laufende_kosten_referenz(t) - laufende_kosten_eauto(t)
  *              + wertverlust_referenz(t) - wertverlust_eauto(t)
  *              - kapitalkosten(t)
  *
  * Zum Zeitpunkt 0 bleibt genau `förderung - wallbox` übrig, weil sich
  * Kaufpreise und Restwerte auf beiden Seiten aufheben. Der Break-even ist der
  * erste Monat, in dem vorteil(t) das Vorzeichen wechselt.
+ *
+ * Die laufenden Kosten werden monatlich aufsummiert, weil Kraftstoff und Strom
+ * unterschiedlich schnell teurer werden. Alle Beträge sind heutige Euro, die
+ * Preissteigerungen deshalb real - der Anteil über der allgemeinen Inflation.
  */
 
 import { withDefaults } from './defaults.js';
@@ -33,6 +37,15 @@ const num = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallb
 /** Restwert nach `years` Jahren bei jährlich gleichbleibender Verlustrate. */
 export function residualValue(base, annualRate, years) {
   return base * Math.pow(1 - clamp(annualRate, 0, 0.6), years);
+}
+
+/**
+ * Realer Preisfaktor nach `years` Jahren. Bei 2 Prozent Steigerung liefert
+ * priceFactor(0.02, 5) rund 1,104 - der Kraftstoff kostet dann real 10,4
+ * Prozent mehr als heute.
+ */
+export function priceFactor(annualGrowth, years) {
+  return Math.pow(1 + clamp(num(annualGrowth), -0.5, 0.5), years);
 }
 
 /** Mischpreis je kWh aus Heim- und Fremdladeanteil, inklusive Ladeverlust. */
@@ -137,12 +150,30 @@ export function compareVehicle(rawInput, vehicle) {
   const rEv = num(input.ev.depreciationRate, 0.16);
   const monthlyCapitalRate = num(input.ev.capitalCostRate, 0) / MONTHS;
 
+  const fuelGrowth = num(input.prices.fuelGrowth);
+  const electricityGrowth = num(input.prices.electricityGrowth);
+
+  // Nur die Energiekosten steigen mit der Preisprognose, der Rest bleibt fest.
+  const fixedIcePerMonth = (reference.costs.total - reference.costs.fuel) / MONTHS;
+  const fixedEvPerMonth = (evCosts.total - evCosts.energy) / MONTHS;
+  const fuelPerMonth = reference.costs.fuel / MONTHS;
+  const energyPerMonth = evCosts.energy / MONTHS;
+
   const totalMonths = years * MONTHS;
   const monthly = [];
   let capitalCostCum = 0;
+  let runningIce = 0;
+  let runningEv = 0;
 
   for (let m = 0; m <= totalMonths; m++) {
     const t = m / MONTHS;
+    if (m > 0) {
+      // Preisstand in der Mitte des Monats - vermeidet einen Sprung im ersten Jahr.
+      const tMid = (m - 0.5) / MONTHS;
+      runningIce += fixedIcePerMonth + fuelPerMonth * priceFactor(fuelGrowth, tMid);
+      runningEv += fixedEvPerMonth + energyPerMonth * priceFactor(electricityGrowth, tMid);
+    }
+
     const assetRef = residualValue(reference.base, reference.rate, t);
     const assetEv = residualValue(vehicle.price, rEv, t);
     // Wallbox linear über den Betrachtungszeitraum abgeschrieben.
@@ -153,12 +184,21 @@ export function compareVehicle(rawInput, vehicle) {
     const advantage =
       subsidy -
       wallbox +
-      annualSavings * t +
+      (runningIce - runningEv) +
       (reference.base - assetRef) -
       (vehicle.price - assetEv) -
       capitalCostCum;
 
-    monthly.push({ month: m, years: t, assetRef, assetEv, advantage, capitalCost: capitalCostCum });
+    monthly.push({
+      month: m,
+      years: t,
+      assetRef,
+      assetEv,
+      runningIce,
+      runningEv,
+      advantage,
+      capitalCost: capitalCostCum,
+    });
   }
 
   let breakEvenMonths = null;
@@ -178,21 +218,27 @@ export function compareVehicle(rawInput, vehicle) {
 
   const yearly = monthly
     .filter((p) => p.month % MONTHS === 0)
-    .map((p) => ({
-      year: p.month / MONTHS,
-      km: num(input.profile.kmPerYear) * (p.month / MONTHS),
-      advantage: p.advantage,
-      cumulativeIce: reference.costs.total * (p.month / MONTHS) + (reference.base - p.assetRef),
-      cumulativeEv:
-        evCosts.total * (p.month / MONTHS) +
-        (vehicle.price - p.assetEv) +
-        wallbox -
-        subsidy +
-        p.capitalCost,
-    }));
+    .map((p, index, all) => {
+      const previous = all[index - 1];
+      return {
+        year: p.month / MONTHS,
+        km: num(input.profile.kmPerYear) * (p.month / MONTHS),
+        advantage: p.advantage,
+        cumulativeIce: p.runningIce + (reference.base - p.assetRef),
+        cumulativeEv:
+          p.runningEv + (vehicle.price - p.assetEv) + wallbox - subsidy + p.capitalCost,
+        // Ersparnis, die genau in diesem Jahr anfällt.
+        savings: previous
+          ? p.runningIce - previous.runningIce - (p.runningEv - previous.runningEv)
+          : 0,
+      };
+    });
 
   const last = yearly[yearly.length - 1];
   const km = Math.max(1, num(input.profile.kmPerYear));
+  const kwhPrice = blendedKwhPrice(input.ev);
+  const endFactorFuel = priceFactor(fuelGrowth, years);
+  const endFactorPower = priceFactor(electricityGrowth, years);
 
   return {
     vehicleId: vehicle.id,
@@ -202,12 +248,27 @@ export function compareVehicle(rawInput, vehicle) {
     annual: {
       ice: reference.costs,
       ev: evCosts,
-      savings: annualSavings,
+      // Ersparnis im ersten Jahr. Bei steigenden Preisen wächst sie danach,
+      // deshalb stehen Verlauf und Durchschnitt gleich daneben.
+      savings: yearly[1] ? yearly[1].savings : annualSavings,
+      savingsFirstYear: yearly[1] ? yearly[1].savings : annualSavings,
+      savingsLastYear: last.savings,
+      savingsAverage: (runningIce - runningEv) / years,
+      savingsStatic: annualSavings,
+    },
+    prices: {
+      fuelGrowth,
+      electricityGrowth,
+      fuelToday: num(input.current.fuelPrice),
+      fuelAtEnd: num(input.current.fuelPrice) * endFactorFuel,
+      kwhToday: kwhPrice,
+      kwhAtEnd: kwhPrice * endFactorPower,
+      escalating: fuelGrowth !== 0 || electricityGrowth !== 0,
     },
     evUpfront,
     referenceUpfront: reference.upfront,
     extraUpfront: evUpfront - reference.upfront,
-    kwhPrice: blendedKwhPrice(input.ev),
+    kwhPrice,
     costPer100Ice: (reference.costs.fuel / km) * 100,
     costPer100Ev: (evCosts.energy / km) * 100,
     breakEvenMonths,

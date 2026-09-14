@@ -196,3 +196,55 @@ test('Ein Fahrzeug mit Break-even schlägt eines ohne', () => {
     assert.ok(bestWith > bestWithout);
   }
 });
+
+test('Ohne Preissteigerung bleibt die Ersparnis über alle Jahre gleich', () => {
+  const input = withDefaults({ prices: { fuelGrowth: 0, electricityGrowth: 0 } });
+  const result = compareVehicle(input, vehicleById('vw-id3'));
+  assert.ok(Math.abs(result.annual.savingsFirstYear - result.annual.savingsStatic) < 1e-6);
+  assert.ok(Math.abs(result.annual.savingsLastYear - result.annual.savingsFirstYear) < 1e-6);
+  assert.ok(Math.abs(result.annual.savingsAverage - result.annual.savingsFirstYear) < 1e-6);
+  assert.equal(result.prices.escalating, false);
+});
+
+test('Steigende Kraftstoffpreise verkürzen den Break-even', () => {
+  const vehicle = vehicleById('vw-id3');
+  const flat = compareVehicle(withDefaults({ scenario: 'replace', prices: { fuelGrowth: 0, electricityGrowth: 0 } }), vehicle);
+  const rising = compareVehicle(withDefaults({ scenario: 'replace', prices: { fuelGrowth: 0.06, electricityGrowth: 0.01 } }), vehicle);
+  assert.ok(rising.annual.savingsLastYear > rising.annual.savingsFirstYear);
+  assert.ok(rising.totalAdvantage > flat.totalAdvantage);
+  assert.ok(rising.breakEvenMonths < flat.breakEvenMonths);
+});
+
+test('Steigende Strompreise verschlechtern die Bilanz', () => {
+  const vehicle = vehicleById('vw-id3');
+  const flat = compareVehicle(withDefaults({ scenario: 'replace', prices: { fuelGrowth: 0, electricityGrowth: 0 } }), vehicle);
+  const power = compareVehicle(withDefaults({ scenario: 'replace', prices: { fuelGrowth: 0, electricityGrowth: 0.06 } }), vehicle);
+  assert.ok(power.totalAdvantage < flat.totalAdvantage);
+  assert.ok(power.annual.savingsLastYear < power.annual.savingsFirstYear);
+});
+
+test('Preisprognose bleibt mit der Kostendifferenz konsistent', () => {
+  const input = withDefaults({ prices: { fuelGrowth: 0.045, electricityGrowth: 0.02 } });
+  const result = compareVehicle(input, vehicleById('kia-ev3'));
+  for (const point of result.yearly) {
+    assert.ok(Math.abs(point.cumulativeIce - point.cumulativeEv - point.advantage) < 1e-6, `Jahr ${point.year}`);
+  }
+  // Die Summe der Jahresersparnisse muss den laufenden Anteil exakt ergeben.
+  const summed = result.yearly.reduce((acc, p) => acc + p.savings, 0);
+  assert.ok(Math.abs(summed - result.annual.savingsAverage * result.years) < 1e-6);
+});
+
+test('Endpreise folgen der angesetzten Steigerung', () => {
+  const input = withDefaults({ profile: { horizonYears: 10 }, prices: { fuelGrowth: 0.03, electricityGrowth: 0 } });
+  const result = compareVehicle(input, vehicleById('mg4'));
+  assert.ok(Math.abs(result.prices.fuelAtEnd - result.prices.fuelToday * Math.pow(1.03, 10)) < 1e-9);
+  assert.ok(Math.abs(result.prices.kwhAtEnd - result.prices.kwhToday) < 1e-9);
+});
+
+test('Negative Steigerung senkt die Energiekosten', () => {
+  const vehicle = vehicleById('mg4');
+  const flat = compareVehicle(withDefaults({ prices: { fuelGrowth: 0, electricityGrowth: 0 } }), vehicle);
+  const falling = compareVehicle(withDefaults({ prices: { fuelGrowth: -0.02, electricityGrowth: 0 } }), vehicle);
+  assert.ok(falling.annual.savingsLastYear < flat.annual.savingsLastYear);
+  assert.ok(falling.totalAdvantage < flat.totalAdvantage);
+});

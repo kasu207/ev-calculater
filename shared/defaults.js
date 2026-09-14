@@ -38,6 +38,15 @@ export const defaults = {
     maintenance: 600,
     depreciationRate: 0.13,
   },
+  /**
+   * Preisprognose. Die gesamte Rechnung läuft in heutigen Euro, deshalb sind
+   * hier reale Steigerungen einzutragen - also der Anteil, der über die
+   * allgemeine Inflation hinausgeht.
+   */
+  prices: {
+    fuelGrowth: 0.02,
+    electricityGrowth: 0.01,
+  },
   ev: {
     homeChargeShare: 0.7,
     homePrice: 0.32,

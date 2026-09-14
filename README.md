@@ -11,8 +11,9 @@ ES-Module im Browser.
 1. **Fahrprofil erfassen** – Jahresfahrleistung, Betrachtungszeitraum, längste Strecke.
 2. **Aktuelles Auto bewerten** – Verkaufserlös, Verbrauch, Kraftstoffpreis, Versicherung,
    Kfz-Steuer, Wartung, sonstige Fixkosten, Wertverlust.
-3. **Strom und Laden** – Anteil Heimladen, Strompreise, Ladeverlust, Wallbox, Förderung,
-   THG-Quote, Kapitalkosten.
+3. **Energiepreise und Laden** – Anteil Heimladen, Strompreise, Ladeverlust, Wallbox,
+   Förderung, THG-Quote, Kapitalkosten sowie die **Preisprognose** für Kraftstoff und
+   Strom.
 4. **Anforderungen** – Budget, Sitzplätze, Anhängelast, Reichweite, Kofferraum,
    Karosserieform.
 5. **Ergebnis** – Break-even in Jahren und Kilometern, Kostenverlauf als Diagramm,
@@ -37,7 +38,7 @@ Der wirtschaftliche Vorteil des E-Autos zum Zeitpunkt `t` (in Jahren):
 
 ```
 vorteil(t) = förderung − wallbox
-           + ersparnis_laufend · t
+           + laufende_kosten_referenz(t) − laufende_kosten_eauto(t)
            + wertverlust_referenz(t) − wertverlust_eauto(t)
            − kapitalkosten(t)
 ```
@@ -49,6 +50,33 @@ das Vorzeichen wechselt; gerechnet wird monatsgenau, dargestellt in Jahresschrit
 Restwerte fallen geometrisch (gleichbleibender Prozentsatz pro Jahr auf den jeweiligen
 Restwert). Kapitalkosten laufen auf das zusätzlich gebundene Geld
 (`restwert_eauto − restwert_referenz`, zuzüglich der noch nicht abgeschriebenen Wallbox).
+
+### Preisprognose für Kraftstoff und Strom
+
+Die laufenden Kosten werden monatlich aufsummiert, weil sich Kraftstoff und Strom
+unterschiedlich schnell verteuern. Nur der Energieanteil wächst, Versicherung, Steuer und
+Wartung bleiben fest:
+
+```
+energiekosten(monat m) = energiekosten_heute / 12 · (1 + steigerung)^((m − 0,5) / 12)
+```
+
+Der Preisstand wird in der Monatsmitte angesetzt, damit im ersten Jahr kein Sprung
+entsteht. Die gesamte Rechnung läuft in **heutigen Euro**, deshalb sind die Steigerungen
+**real** einzutragen – der Anteil über der allgemeinen Inflation. So bleibt das Modell
+ohne zusätzliche Abzinsung konsistent.
+
+Drei Voreinstellungen sind mit einem Klick umschaltbar, eigene Werte (auch negative)
+überschreiben sie jederzeit:
+
+| Voreinstellung | Kraftstoff | Strom |
+| --- | --- | --- |
+| Preise bleiben real konstant | 0 % | 0 % |
+| Moderat steigend (Vorgabe) | 2,0 % | 1,0 % |
+| CO2-Preis schlägt durch | 5,0 % | 1,0 % |
+
+Das Ergebnis weist die Ersparnis im ersten und im letzten Jahr sowie den Durchschnitt
+getrennt aus, dazu den Kraftstoff- und Strompreis am Ende des Zeitraums.
 
 ### Fahrzeugbewertung
 
@@ -71,7 +99,7 @@ mit Begründung.
 ```bash
 npm start          # http://localhost:3000
 npm run dev        # mit automatischem Neustart
-npm test           # 21 Tests des Rechenkerns
+npm test           # 27 Tests des Rechenkerns
 ```
 
 Port und Adresse sind über `PORT` und `HOST` einstellbar. Es werden keine Pakete
@@ -101,7 +129,7 @@ curl -X POST http://localhost:3000/api/recommend \
 shared/      Rechenkern – von Server und Tests gemeinsam genutzt
   defaults.js    Vorgabewerte aller Eingaben
   vehicles.js    Fahrzeugdatenbank (28 Modelle)
-  calc.js        Kostenvergleich, Restwerte, Break-even
+  calc.js        Kostenvergleich, Restwerte, Preisprognose, Break-even
   match.js       Bewertung und Empfehlung
   offers.js      Kauf-, Finanzierungs- und Leasingmodell, Anfragetext
 server/      HTTP-Server und API, ohne Fremdbibliotheken
@@ -123,8 +151,11 @@ Fahrzeugdaten sind **Richtwerte nach Herstellerangabe (Stand 2025/2026)** und er
 kein Angebot. Die Angebotsvarianten sind **Modellrechnungen mit marktüblichen
 Konditionen**, keine echten Händlerangebote und keine Zusage über Nachlässe.
 
-Nicht im Modell enthalten: Preissteigerungen bei Kraftstoff und Strom, Reparaturrisiken
-des Altfahrzeugs, steuerliche Effekte bei gewerblicher Nutzung.
+Die Voreinstellungen der Preisprognose sind Annahmen, keine Prognose – sie machen die
+Bandbreite durchspielbar und sind frei änderbar.
+
+Nicht im Modell enthalten: Reparaturrisiken des Altfahrzeugs, künftige Änderungen bei
+Kfz-Steuer und Förderung, steuerliche Effekte bei gewerblicher Nutzung.
 
 Die Berechnung läuft in der Sitzung des Nutzers, Eingaben werden ausschließlich lokal
 im Browser gespeichert und nicht weitergegeben.
