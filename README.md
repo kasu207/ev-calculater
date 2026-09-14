@@ -127,12 +127,39 @@ Danach ist der Rechner unter `http://<server>:7000` erreichbar.
 
 ### Bind-Adresse
 
-Standardmäßig bindet der Port auf alle Schnittstellen. Hinter einem Reverse Proxy
-ist es besser, ihn nur lokal zu öffnen:
+Standardmäßig setzt die Compose-Datei keine Host-IP, Docker bindet den Port also
+wie üblich auf IPv4 und IPv6. Hinter einem Reverse Proxy ist es besser, ihn
+gezielt nur lokal zu öffnen:
 
 ```bash
 BIND_ADDR=127.0.0.1 docker compose up -d
 ```
+
+### Fehlersuche
+
+**`curl: (7) Failed to connect to localhost port 7000 after 0 ms`, obwohl der
+Container läuft.** Die Fehlermeldung ohne messbare Laufzeit bedeutet, dass die
+Verbindung sofort abgelehnt wurde – meist löst `localhost` dann zuerst nach IPv6
+`::1` auf, wo nichts lauscht. Gegenprobe:
+
+```bash
+curl http://127.0.0.1:7000/api/health
+```
+
+Antwortet diese Adresse, ist es genau das. Sorgen Sie dafür, dass `BIND_ADDR`
+nicht auf `0.0.0.0` gesetzt ist – dann bindet Docker wieder beide Protokolle.
+
+**Prüfen, ob die Anwendung im Container selbst antwortet:**
+
+```bash
+docker compose exec ev-calculator \
+  node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>r.text()).then(console.log)"
+docker compose logs --tail=30
+docker inspect --format '{{json .State.Health}}' ev-calculator
+```
+
+**Port bereits belegt?** `ss -ltnp | grep 7000` zeigt, wer ihn hält. Ein anderer
+Host-Port lässt sich in `docker-compose.yml` unter `ports` eintragen.
 
 ### Betrieb hinter einem Reverse Proxy
 

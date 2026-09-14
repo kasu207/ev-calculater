@@ -5,10 +5,13 @@ services:
     container_name: ev-calculator
 
     # Erreichbar auf Port 7000 des Hosts, intern lauscht der Server auf 3000.
-    # Hinter einem Reverse Proxy besser nur lokal binden:
+    # Ohne BIND_ADDR wird keine Host-IP gesetzt, damit Docker wie üblich IPv4
+    # und IPv6 bindet - sonst schlägt "curl localhost:7000" auf Hosts fehl,
+    # die localhost zuerst nach ::1 auflösen.
+    # Hinter einem Reverse Proxy gezielt nur lokal binden:
     #   BIND_ADDR=127.0.0.1 docker compose up -d
     ports:
-      - "${BIND_ADDR:-0.0.0.0}:7000:3000"
+      - "${BIND_ADDR:+${BIND_ADDR}:}7000:3000"
 
     restart: unless-stopped
 
