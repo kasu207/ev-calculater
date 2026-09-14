@@ -89,3 +89,23 @@ test('Schreibende Methoden auf statischen Pfaden werden abgelehnt', async () => 
   const res = await fetch(`${base}/`, { method: 'DELETE' });
   assert.equal(res.status, 405);
 });
+
+test('Ohne konfigurierte Quelle antwortet /api/market still', async () => {
+  const res = await fetch(`${base}/api/market`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.configured, { fuel: false, power: false });
+  assert.equal(body.fuel.available, false);
+  assert.equal(body.power.available, false);
+});
+
+test('Meta nennt Herkunft der Fahrzeugdaten und Zustand der Marktquellen', async () => {
+  const res = await fetch(`${base}/api/meta`);
+  const body = await res.json();
+  assert.equal(body.vehicleSource.source, 'snapshot');
+  assert.equal(body.vehicleSource.fallback, false);
+  assert.equal(body.market.fuel, false);
+  // Die Postleitzahlentabelle liegt dem Abbild bei, sonst ist keine regionale
+  // Abfrage möglich.
+  assert.equal(body.market.postalLookup, true);
+});

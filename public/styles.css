@@ -473,6 +473,50 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .chip--on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Herkunftszeile unter einem Feld: woher der Tageswert kommt und wie alt er ist. */
+.market {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  margin-top: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.market[hidden] { display: none; }
+.market__text { flex: 1 1 12rem; min-width: 0; }
+.market__text strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.market__source { display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 0.15rem; }
+.market__apply {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  min-height: 36px;
+  cursor: pointer;
+  flex: none;
+}
+.market__apply:hover { background: var(--accent-soft); }
+.market__applied { color: var(--text-muted); font-size: 0.75rem; flex: none; }
+.market__region { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.market__region label { font-weight: 600; font-size: 0.78rem; color: var(--text-secondary); }
+.market__region input {
+  width: 6.5rem;
+  min-height: 40px;
+  padding: 0.35rem 0.6rem;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-0);
+}
+.market__region small { flex: 1 1 100%; color: var(--text-muted); font-size: 0.74rem; line-height: 1.4; }
+
 /* Optionale Feinwerte: standardmässig eingeklappt, damit ein Schritt kurz bleibt. */
 .advanced {
   margin-top: 1.6rem;
@@ -878,6 +922,9 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, m
 .site-footer { margin-top: clamp(3rem, 8vw, 5rem); padding-top: 1.75rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.84rem; }
 .site-footer h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text-secondary); font-weight: 700; margin-bottom: 0.9rem; }
 .site-footer ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.5rem; max-width: 80ch; line-height: 1.55; }
+.site-footer a { color: inherit; }
+.site-footer__sources { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); font-size: 0.8rem; }
+.site-footer__sources[hidden] { display: none; }
 
 /* ------------------------------------------------------------------- Mobil */
 @media (max-width: 860px) {

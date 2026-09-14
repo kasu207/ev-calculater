@@ -249,7 +249,8 @@ Nutzers, der Container ist jederzeit ersetzbar.
 
 | Endpunkt | Zweck |
 | --- | --- |
-| `GET /api/meta` | Vorgabewerte, Karosseriebezeichnungen, Stand der Fahrzeugdaten |
+| `GET /api/meta` | Vorgabewerte, Karosseriebezeichnungen, Stand und Herkunft der Fahrzeugdaten, Zustand der Marktquellen |
+| `GET /api/market` | tagesaktuelle Kraftstoff- und Börsenstrompreise, optional `?plz=` für die Region |
 | `GET /api/vehicles` | vollständige Fahrzeugdatenbank |
 | `POST /api/recommend` | Ranking, beste Gesamtempfehlung, wirtschaftlicher Sieger, Gegenszenario |
 | `POST /api/vehicle` | Einzelbewertung, Angebotsvarianten, Anfragetext |
@@ -268,16 +269,105 @@ curl -X POST http://localhost:3000/api/recommend \
 ```
 shared/      Rechenkern – von Server und Tests gemeinsam genutzt
   defaults.js    Vorgabewerte aller Eingaben
-  vehicles.js    Fahrzeugdatenbank (28 Modelle)
+  vehicles.js    Fahrzeugdatenbank (28 Modelle), Rückfall für externe Quellen
+  vehicle-schema.js  Prüfregeln für Fahrzeugdatensätze
   calc.js        Kostenvergleich, Restwerte, Preisprognose, Break-even
   match.js       Bewertung und Empfehlung
   offers.js      Kauf-, Finanzierungs- und Leasingmodell, Anfragetext
 server/      HTTP-Server und API, ohne Fremdbibliotheken
+  market/        Marktdaten: Adapter, Zwischenspeicher, Fahrzeugquelle
 public/      Frontend (ES-Module, SVG-Diagramme ohne Chartbibliothek)
+data/        Postleitzahlen-Koordinaten (GeoNames, CC BY 4.0)
+scripts/     Werkzeuge zur Datenpflege
 test/        Tests mit dem Node-Testrunner
 Dockerfile
 docker-compose.yml
 ```
+
+## Tagesaktuelle Marktdaten
+
+Preise altern unterschiedlich schnell. Kraftstoff ändert sich mehrmals täglich,
+Listenpreise von Fahrzeugen zwei- bis viermal im Jahr. Der Rechner trennt das
+deshalb in Quellen, die sich einzeln zuschalten lassen. **Ohne Konfiguration geht
+keine einzige Anfrage nach außen** - die Anwendung rechnet dann wie bisher
+ausschließlich mit den eingetragenen Werten.
+
+| Größe | Quelle | Aktualität | Voraussetzung |
+| --- | --- | --- | --- |
+| Kraftstoffpreis | [Tankerkönig](https://creativecommons.tankerkoenig.de/) (Daten der Markttransparenzstelle) | täglich, faktisch minütlich | kostenloser API-Schlüssel |
+| Börsenstrompreis | [Energy-Charts, Fraunhofer ISE](https://www.energy-charts.info/) | täglich (Day-Ahead) | nichts, CC BY 4.0 |
+| Fahrzeugpreise und -daten | mitgelieferter Snapshot, Datei oder Lizenzfeed | quartalsweise bis nächtlich | für nächtlich: Lizenzvertrag |
+
+### Einschalten
+
+```bash
+# Kraftstoffpreise: Schlüssel unter creativecommons.tankerkoenig.de beantragen
+TANKERKOENIG_API_KEY=... 
+MARKET_POSTAL_CODE=10115      # Region des Betreibers
+MARKET_RADIUS_KM=10           # Umkreis der Tankstellensuche, max. 25
+
+# Börsenstrompreis
+MARKET_POWER=on
+```
+
+In `docker-compose.yml` sind die Variablen bereits eingetragen und leer
+vorbelegt; es genügt eine `.env` neben der Compose-Datei.
+
+Weitere Stellschrauben: `MARKET_TTL_MINUTES` (Gültigkeit eines Werts, Vorgabe
+60), `MARKET_MIN_INTERVAL_SECONDS` (Mindestabstand zweier Abrufe, Vorgabe 300 -
+Tankerkönig erlaubt eine Abfrage je fünf Minuten), `MARKET_POWER_ZONE` (Vorgabe
+`DE-LU`), `MARKET_FUEL_ENDPOINT` und `MARKET_POWER_ENDPOINT` für einen eigenen
+Spiegel.
+
+### Verhalten im Betrieb
+
+- **Vorbelegen, nie überschreiben.** Der Tagespreis füllt das Feld nur, solange
+  der Nutzer es nie selbst angefasst hat. Danach steht der Live-Wert als
+  Angebot daneben und wird erst auf Klick übernommen.
+- **Median statt Mittelwert.** Aus den Tankstellen im Umkreis wird der Median
+  gebildet; einzelne Autobahnpreise verschöben den Schnitt sonst um Cent.
+- **Herkunft am Wert.** Unter dem Feld steht, woher die Zahl kommt, aus wie
+  vielen Tankstellen und wie alt sie ist - keine anonyme Vorbelegung.
+- **Ausfall ist eingeplant.** Verfallszeit, Mindestabstand und Rückfall auf den
+  letzten Erfolg sitzen im Dienst. Ist eine Quelle nicht erreichbar, rechnet die
+  Anwendung mit dem letzten bekannten Wert weiter und sagt, wie alt er ist.
+- **Der Börsenpreis wird nicht übernommen.** Er ist kein Haushaltstarif und
+  steht deshalb nur als Einordnung daneben - maßgeblich ist er allein bei einem
+  dynamischen Tarif.
+
+### Regionale Preise und Datenschutz
+
+Ohne Zutun gilt die Region, die der Betreiber hinterlegt hat; es verlässt nichts
+Nutzerbezogenes den Server. Trägt jemand im Formular eine eigene Postleitzahl
+ein, wird diese - und nur diese - für die Umkreissuche an Tankerkönig
+übermittelt. Der Abruf läuft serverseitig, nicht im Browser.
+
+Die Auflösung von Postleitzahl zu Koordinate geschieht im eigenen Prozess über
+`data/plz-koordinaten.json` (10814 Einträge, Quelle GeoNames, CC BY 4.0). Neu
+erzeugen lässt sie sich mit `npm run data:plz`.
+
+### Fahrzeugdaten
+
+Für Fahrzeugpreise gibt es keinen kostenlosen, rechtlich sauberen Feed:
+Hersteller-Konfiguratoren und Fachdatenbanken untersagen das Auslesen, offene
+Verwaltungsdaten enthalten keine Preise. Der Rechner liest sie deshalb über
+dieselbe Adapterschicht aus einer von drei Quellen:
+
+| Quelle | Konfiguration | Wofür |
+| --- | --- | --- |
+| `snapshot` | nichts | die im Repository gepflegten Richtwerte, immer der Rückfall |
+| `file` | `VEHICLES_FILE=/app/daten/vehicles.json` | Datei als Volume, Preiskorrektur ohne neues Abbild |
+| `feed` | `VEHICLES_URL=https://...` | nächtlicher Vollabzug, wie ihn Anbieter mit Lizenzvertrag bereitstellen (etwa die Data Services der EV Database) |
+
+Jede externe Lieferung wird vor der Übernahme gegen `shared/vehicle-schema.js`
+geprüft - Pflichtfelder, Wertebereiche, eindeutige Kennungen und eine Querprobe
+zwischen Reichweite, Batterie und Verbrauch. Fällt sie durch, bleibt der letzte
+gültige Stand aktiv und der Grund steht im Protokoll. Erwartet wird entweder ein
+Array oder ein Objekt mit den Feldern `vehicles` und `dataVintage`; ein Feed wird
+alle `VEHICLES_REFRESH_HOURS` Stunden neu geholt (Vorgabe 24).
+
+`GET /api/meta` nennt unter `vehicleSource`, welche Quelle gerade gilt und ob
+auf den Snapshot zurückgefallen wurde.
 
 ## Bedienung
 

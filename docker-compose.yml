@@ -27,6 +27,33 @@ services:
       HOST: 0.0.0.0
       TZ: Europe/Berlin
 
+      # --- Tagesaktuelle Marktdaten (standardmäßig aus) ---------------------
+      # Ohne diese Werte geht keine einzige Anfrage nach außen und der Rechner
+      # arbeitet ausschließlich mit den eingetragenen Zahlen.
+      #
+      # Kraftstoffpreise: kostenloser Schlüssel unter
+      # https://creativecommons.tankerkoenig.de/ - die Quelle erlaubt eine
+      # Abfrage je fünf Minuten, der Server hält das von sich aus ein.
+      TANKERKOENIG_API_KEY: "${TANKERKOENIG_API_KEY:-}"
+      # Region des Betreibers. Nutzer können im Formular eine eigene
+      # Postleitzahl eintragen; nur dann verlässt eine Ortsangabe den Server.
+      MARKET_POSTAL_CODE: "${MARKET_POSTAL_CODE:-}"
+      MARKET_RADIUS_KM: "${MARKET_RADIUS_KM:-10}"
+      # Börsenstrompreis (Energy-Charts, Fraunhofer ISE): "on" schaltet ihn ein.
+      MARKET_POWER: "${MARKET_POWER:-off}"
+
+      # --- Fahrzeugdaten aus externer Quelle (optional) ---------------------
+      # Datei als Volume einhängen und hier eintragen, dann lässt sich der
+      # Datenstand ohne neues Abbild wechseln. VEHICLES_URL nimmt stattdessen
+      # einen nächtlichen Vollabzug entgegen, wie ihn Anbieter mit
+      # Lizenzvertrag bereitstellen.
+      VEHICLES_FILE: "${VEHICLES_FILE:-}"
+      VEHICLES_URL: "${VEHICLES_URL:-}"
+
+    # Für VEHICLES_FILE: die Datei aus dem Hostverzeichnis einhängen.
+    # volumes:
+    #   - ./daten/vehicles.json:/app/daten/vehicles.json:ro
+
     healthcheck:
       test:
         - CMD

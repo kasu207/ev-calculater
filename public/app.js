@@ -9,6 +9,8 @@ import { renderCostLineChart, renderAnnualBars, renderScoreMeter } from './chart
 
 const STORAGE_KEY = 'ev-calculator-input-v1';
 const THEME_KEY = 'ev-calculator-theme';
+const TOUCHED_KEY = 'ev-calculator-touched-v1';
+const PLZ_KEY = 'ev-calculator-plz-v1';
 
 const state = {
   input: null,
@@ -21,6 +23,12 @@ const state = {
   pending: false,
   // Welche Feinwert-Bereiche offen sind, überlebt ein Neuzeichnen des Formulars.
   openAdvanced: new Set(),
+  // Tagesaktuelle Marktdaten, sofern der Betreiber eine Quelle eingerichtet hat.
+  market: null,
+  // Felder, die der Nutzer selbst angefasst hat. Sie werden nie automatisch
+  // überschrieben - eine eingetragene Zahl ist eine Entscheidung.
+  touched: new Set(),
+  postalCode: '',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -159,7 +167,106 @@ function renderField(field) {
           tabindex="-1" aria-label="${escapeHtml(field.label)}: Wert erhöhen">+</button>
       </div>
       ${hint}
+      ${marketBlock(field)}
     </div>`;
+}
+
+/* ------------------------------------------------------- Tagesaktuelle Werte */
+
+function fuelKeyForType(type) {
+  if (type === 'diesel') return 'diesel';
+  if (type === 'benzin') return 'e5';
+  return null; // Autogas meldet die Quelle nicht.
+}
+
+function marketAge(iso) {
+  const fetched = Date.parse(iso);
+  if (!Number.isFinite(fetched)) return '';
+  const minutes = Math.round((Date.now() - fetched) / 60000);
+  if (minutes < 60) return `vor ${Math.max(1, minutes)} Min.`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `vor ${hours} Std.`;
+  return `vom ${new Date(fetched).toLocaleDateString('de-DE')}`;
+}
+
+/** Inhalt der Herkunftszeile am Kraftstoffpreis. */
+function fuelMarketContent() {
+  const fuel = state.market?.fuel;
+  if (!fuel?.available) return '';
+
+  const key = fuelKeyForType(state.input.current.fuelType);
+  if (!key) {
+    return `<span class="market__text">Für Autogas liefert ${escapeHtml(fuel.provider.name)} keine Preise. Bitte selbst eintragen.</span>`;
+  }
+  const price = fuel.prices?.[key];
+  if (!price) {
+    return `<span class="market__text">Im Umkreis hat gerade keine Tankstelle einen Preis gemeldet.</span>`;
+  }
+
+  const region = state.market.region?.postalCode
+    ? `um ${escapeHtml(state.market.region.postalCode)}`
+    : 'um den hinterlegten Ort';
+  const differs = Math.abs(price - Number(state.input.current.fuelPrice)) >= 0.005;
+  const e10 = fuel.prices?.e10;
+  const e10Hint = key === 'e5' && e10 ? ` &middot; E10 ${moneyExact(e10)}` : '';
+
+  return `<span class="market__text">
+      <strong>${moneyExact(price)}</strong> heute im Median von ${number(fuel.stations)} Tankstellen
+      im Umkreis von ${number(state.market.region?.radiusKm || 10)} km ${region}${e10Hint}
+      <span class="market__source">${escapeHtml(fuel.provider.name)}, ${escapeHtml(marketAge(fuel.fetchedAt))}${
+        fuel.stale ? ' (Quelle gerade nicht erreichbar)' : ''
+      }</span>
+    </span>
+    ${
+      differs
+        ? `<button type="button" class="market__apply" data-market-apply="fuel">Übernehmen</button>`
+        : '<span class="market__applied">übernommen</span>'
+    }`;
+}
+
+/** Inhalt der Hinweiszeile am Strompreis. */
+function powerMarketContent() {
+  const power = state.market?.power;
+  if (!power?.available) return '';
+  return `<span class="market__text">
+      Börsenpreis heute im Mittel <strong>${decimal(power.mean * 100)} ct/kWh</strong>
+      (Spanne ${decimal(power.min * 100)} bis ${decimal(power.max * 100)}).
+      Haushaltstarife liegen wegen Netzentgelten, Abgaben und Marge darüber - maßgeblich ist dieser
+      Wert nur bei einem dynamischen Tarif.
+      <span class="market__source">${escapeHtml(power.provider.name)}, ${escapeHtml(marketAge(power.fetchedAt))}</span>
+    </span>`;
+}
+
+/**
+ * Die Postleitzahl ist keine Rechengröße, sondern steuert nur die regionale
+ * Abfrage. Deshalb steht sie in der Herkunftszeile und nicht im Formular.
+ */
+function postalControl() {
+  if (!state.market?.configured?.fuel) return '';
+  return `<div class="market__region">
+      <label for="marketPlz">Postleitzahl für regionale Preise</label>
+      <input type="text" id="marketPlz" inputmode="numeric" maxlength="5" autocomplete="postal-code"
+        placeholder="${escapeHtml(state.market.region?.postalCode || '00000')}" value="${escapeHtml(state.postalCode)}"
+        aria-describedby="marketPlzHint" />
+      <small id="marketPlzHint">Wird an ${escapeHtml(state.market.fuel?.provider?.name || 'die Preisquelle')} übermittelt, um die Tankstellen im Umkreis abzufragen. Leer lassen für die Region des Betreibers.</small>
+    </div>`;
+}
+
+function marketBlock(field) {
+  if (!field.market) return '';
+  const content =
+    field.market === 'fuel' ? `${fuelMarketContent()}${postalControl()}` : powerMarketContent();
+  return `<div class="market" data-market="${field.market}" ${content ? '' : 'hidden'}>${content}</div>`;
+}
+
+/** Zeichnet nur die Herkunftszeilen neu - das Formular bleibt unangetastet. */
+function renderMarketBlocks() {
+  for (const node of document.querySelectorAll('[data-market]')) {
+    const content =
+      node.dataset.market === 'fuel' ? `${fuelMarketContent()}${postalControl()}` : powerMarketContent();
+    node.innerHTML = content;
+    node.hidden = !content;
+  }
 }
 
 function scenarioBlock() {
@@ -776,6 +883,84 @@ function renderLivebar() {
   syncActionBar();
 }
 
+/**
+ * Holt die Marktdaten. Fehler bleiben stumm: eine nicht erreichbare Quelle
+ * ist kein Grund, dem Nutzer den Rechner zu verstellen - er rechnet dann mit
+ * den eingetragenen Werten weiter.
+ */
+async function loadMarket() {
+  try {
+    const query = state.postalCode ? `?plz=${encodeURIComponent(state.postalCode)}` : '';
+    state.market = await api(`/api/market${query}`);
+  } catch {
+    state.market = null;
+    return;
+  }
+  applyMarketDefaults();
+  redrawMarket();
+  renderMarketSources();
+}
+
+function currentFuelPrice() {
+  const fuel = state.market?.fuel;
+  if (!fuel?.available) return null;
+  const key = fuelKeyForType(state.input.current.fuelType);
+  const price = key ? fuel.prices?.[key] : null;
+  return Number.isFinite(price) ? price : null;
+}
+
+function setFuelPrice(price) {
+  if (!Number.isFinite(price)) return;
+  setPath(state.input, 'current.fuelPrice', price);
+  const input = document.getElementById(fieldId('current.fuelPrice'));
+  if (input) input.value = String(price);
+  persist();
+  recomputeSoon();
+}
+
+/**
+ * Vorbelegen, aber nie überschreiben: nur Felder, die der Nutzer nie selbst
+ * angefasst hat, folgen der Tagesquelle.
+ */
+function applyMarketDefaults() {
+  if (state.touched.has('current.fuelPrice')) return;
+  const price = currentFuelPrice();
+  if (price !== null) setFuelPrice(price);
+}
+
+/** Neuzeichnen der Herkunftszeilen, ohne die Eingabe der Postleitzahl zu stören. */
+function redrawMarket() {
+  const active = document.activeElement;
+  const keepFocus = active?.id === 'marketPlz';
+  renderMarketBlocks();
+  if (keepFocus) {
+    const field = $('#marketPlz');
+    if (field) {
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    }
+  }
+}
+
+/** Quellenangaben im Fußbereich - Namensnennung ist Lizenzbedingung. */
+function renderMarketSources() {
+  const list = $('#dataSources');
+  if (!list) return;
+  const sources = [];
+  if (state.market?.fuel?.available) {
+    sources.push(`Kraftstoffpreise: ${state.market.fuel.provider.name} (${state.market.fuel.provider.licence})`);
+  }
+  if (state.market?.power?.available) {
+    sources.push(`Börsenstrompreis: ${state.market.power.provider.name} (${state.market.power.provider.licence})`);
+  }
+  if (!sources.length) {
+    list.hidden = true;
+    return;
+  }
+  list.hidden = false;
+  list.innerHTML = `<li>${sources.map(escapeHtml).join('</li><li>')}</li>`;
+}
+
 /* ------------------------------------------------------------ Berechnung */
 
 async function loadDetail() {
@@ -821,14 +1006,30 @@ async function recompute({ keepSelection = true } = {}) {
 }
 
 const recomputeSoon = debounce(() => recompute(), 250);
+// Die Quelle erlaubt nur wenige Abrufe - nach der Eingabe kurz abwarten.
+const reloadMarketSoon = debounce(() => loadMarket(), 600);
 
 /* ---------------------------------------------------------- Persistenz */
 
 function persist() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.input));
+    localStorage.setItem(TOUCHED_KEY, JSON.stringify([...state.touched]));
+    localStorage.setItem(PLZ_KEY, state.postalCode || '');
   } catch {
     /* privater Modus oder voller Speicher - Berechnung läuft trotzdem */
+  }
+}
+
+/** Selbst gesetzte Felder und die Postleitzahl aus der letzten Sitzung. */
+function restoreSideState() {
+  try {
+    const touched = JSON.parse(localStorage.getItem(TOUCHED_KEY) || '[]');
+    if (Array.isArray(touched)) state.touched = new Set(touched.filter((p) => typeof p === 'string'));
+    const plz = localStorage.getItem(PLZ_KEY) || '';
+    state.postalCode = /^\d{5}$/.test(plz) ? plz : '';
+  } catch {
+    /* ohne gespeicherten Stand ist die Vorbelegung maßgeblich */
   }
 }
 
@@ -867,11 +1068,32 @@ function bindEvents() {
 
   form.addEventListener('input', (event) => {
     const target = event.target;
+
+    // Die Postleitzahl steuert nur die Abfrage, nicht die Rechnung.
+    if (target.id === 'marketPlz') {
+      const digits = target.value.replace(/\D/g, '').slice(0, 5);
+      if (digits !== target.value) target.value = digits;
+      if (digits.length === 5 || digits.length === 0) {
+        state.postalCode = digits;
+        persist();
+        reloadMarketSoon();
+      }
+      return;
+    }
+
     if (!target.dataset.path) return;
 
     if (target.dataset.kind === 'multiselect') return;
 
     setPath(state.input, target.dataset.path, readControl(target));
+    // Ein selbst eingetragener Wert wird nie wieder automatisch überschrieben.
+    state.touched.add(target.dataset.path);
+
+    if (target.dataset.path === 'current.fuelType') {
+      applyMarketDefaults();
+      redrawMarket();
+    }
+    if (target.dataset.path === 'current.fuelPrice') redrawMarket();
 
     if (target.dataset.path.startsWith('prices.')) syncPricePresetState();
 
@@ -900,6 +1122,18 @@ function bindEvents() {
   });
 
   form.addEventListener('click', (event) => {
+    // Tagespreis übernehmen: der Wert folgt danach wieder der Quelle.
+    const applyBtn = event.target.closest('[data-market-apply]');
+    if (applyBtn) {
+      const price = currentFuelPrice();
+      if (price !== null) {
+        state.touched.delete('current.fuelPrice');
+        setFuelPrice(price);
+        redrawMarket();
+      }
+      return;
+    }
+
     // Minus/Plus am Zahlenfeld: Wert um eine Schrittweite verschieben und das
     // normale input-Ereignis auslösen, damit die Neuberechnung anläuft.
     const stepBtn = event.target.closest('[data-step-for]');
@@ -1034,13 +1268,17 @@ function bindEvents() {
 
   $('#resetBtn').addEventListener('click', async () => {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOUCHED_KEY);
     const meta = await api('/api/meta');
     state.input = structuredClone(meta.defaults);
     state.selectedVehicleId = null;
     state.detail = null;
+    state.touched.clear();
     state.openAdvanced.clear();
     renderWizard();
     goToStep(0);
+    applyMarketDefaults();
+    redrawMarket();
     recompute({ keepSelection: false });
   });
 
@@ -1085,6 +1323,7 @@ async function init() {
   try {
     const meta = await api('/api/meta');
     state.bodyLabels = meta.bodyLabels;
+    restoreSideState();
     state.input = restore(meta.defaults);
     const vintage = $('#dataVintage');
     if (vintage) vintage.textContent = `${meta.dataVintage}, ${meta.vehicleCount} Modelle`;
@@ -1102,6 +1341,8 @@ async function init() {
 
   renderWizard();
   bindEvents();
+  // Marktdaten laufen nebenher: das Ergebnis steht auch ohne sie sofort.
+  loadMarket();
   await recompute({ keepSelection: false });
 }
 

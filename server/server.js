@@ -9,10 +9,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defaults, withDefaults } from '../shared/defaults.js';
-import { vehicles, vehicleById, BODY_LABELS, DATA_VINTAGE } from '../shared/vehicles.js';
+import { BODY_LABELS } from '../shared/vehicles.js';
 import { compareVehicle } from '../shared/calc.js';
 import { recommend, evaluateVehicle } from '../shared/match.js';
 import { buildOffers, buildInquiryText } from '../shared/offers.js';
+import { createVehicleStore } from './market/vehicles.js';
+import { createMarketService } from './market/index.js';
+import { loadPostalTable } from './market/plz.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -20,6 +23,25 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const MAX_BODY_BYTES = 256 * 1024;
+const POSTAL_TABLE_FILE = path.join(ROOT, 'data', 'plz-koordinaten.json');
+const VEHICLE_REFRESH_HOURS = Number(process.env.VEHICLES_REFRESH_HOURS) || 24;
+
+/**
+ * Datenquellen. Beide folgen demselben Muster: es gibt immer einen gültigen
+ * Stand im Prozess, externe Quellen verbessern ihn nur. Fällt eine aus,
+ * rechnet die Anwendung weiter und sagt, mit welchem Stand.
+ */
+const vehicleStore = createVehicleStore({
+  file: process.env.VEHICLES_FILE || null,
+  url: process.env.VEHICLES_URL || null,
+});
+
+const marketReady = (async () => {
+  const postalTable = await loadPostalTable(POSTAL_TABLE_FILE);
+  return createMarketService({ postalTable });
+})();
+
+const dataReady = vehicleStore.refresh();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -93,22 +115,39 @@ const routes = {
   'GET /api/health': async () => ({
     status: 'ok',
     uptimeSeconds: Math.round(process.uptime()),
-    vehicleCount: vehicles.length,
+    vehicleCount: vehicleStore.list().length,
   }),
 
-  'GET /api/meta': async () => ({
-    defaults,
-    bodyLabels: BODY_LABELS,
-    dataVintage: DATA_VINTAGE,
-    vehicleCount: vehicles.length,
-  }),
+  'GET /api/meta': async () => {
+    const market = await marketReady;
+    const meta = vehicleStore.meta();
+    return {
+      defaults,
+      bodyLabels: BODY_LABELS,
+      dataVintage: meta.vintage,
+      vehicleCount: meta.count,
+      vehicleSource: { source: meta.source, loadedAt: meta.loadedAt, fallback: meta.fallback },
+      market: market.configuration(),
+    };
+  },
 
-  'GET /api/vehicles': async () => ({ vehicles, bodyLabels: BODY_LABELS }),
+  /**
+   * Tagesaktuelle Marktdaten. Ohne konfigurierte Quelle antwortet der
+   * Endpunkt mit `configured: false` - das Frontend zeigt dann keine
+   * Herkunftszeilen an und nichts wird vorbelegt.
+   */
+  'GET /api/market': async (_body, url) => {
+    const market = await marketReady;
+    return market.marketData({ postalCode: url?.searchParams.get('plz') });
+  },
+
+  'GET /api/vehicles': async () => ({ vehicles: vehicleStore.list(), bodyLabels: BODY_LABELS }),
 
   'POST /api/recommend': async (body) => {
     const input = withDefaults(body.input || {});
-    const limit = Math.min(Math.max(Number(body.limit) || 6, 1), vehicles.length);
-    const result = recommend(input);
+    const list = vehicleStore.list();
+    const limit = Math.min(Math.max(Number(body.limit) || 6, 1), list.length);
+    const result = recommend(input, list);
 
     // Das jeweils andere Szenario wird mitgerechnet, damit das Frontend den
     // Unterschied zwischen "behalten" und "ohnehin neu kaufen" zeigen kann.
@@ -144,7 +183,7 @@ const routes = {
   },
 
   'POST /api/vehicle': async (body) => {
-    const vehicle = vehicleById(body.vehicleId);
+    const vehicle = vehicleStore.byId(body.vehicleId);
     if (!vehicle) throw Object.assign(new Error('Fahrzeug unbekannt'), { status: 404 });
     const input = withDefaults(body.input || {});
     const evaluation = evaluateVehicle(input, vehicle);
@@ -186,7 +225,7 @@ export const server = http.createServer(async (req, res) => {
     if (!handler) return sendJson(res, 404, { error: 'Unbekannter Endpunkt' });
     try {
       const body = req.method === 'POST' ? await readBody(req) : {};
-      sendJson(res, 200, await handler(body));
+      sendJson(res, 200, await handler(body, url));
     } catch (err) {
       const status = err.status || 500;
       if (status >= 500) console.error(err);
@@ -216,9 +255,24 @@ export function shutdown(signal) {
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
+  await dataReady;
+  const market = await marketReady;
   server.listen(PORT, HOST, () => {
+    const meta = vehicleStore.meta();
     console.log(`E-Auto-Rechner läuft auf http://${HOST}:${PORT}`);
+    console.log(`Fahrzeugdaten: ${meta.count} Modelle aus Quelle "${meta.source}"`);
+    const config = market.configuration();
+    console.log(
+      `Marktdaten: Kraftstoff ${config.fuel ? `ein (${config.defaultPostalCode || 'Koordinaten'}, ${config.radiusKm} km)` : 'aus'}, ` +
+        `Börsenstrom ${config.power ? 'ein' : 'aus'}`,
+    );
   });
+
+  // Externe Fahrzeugquellen werden regelmäßig neu geholt. Ohne konfigurierte
+  // Quelle ist refresh() ein Nichtstuer.
+  if (process.env.VEHICLES_FILE || process.env.VEHICLES_URL) {
+    setInterval(() => vehicleStore.refresh(), VEHICLE_REFRESH_HOURS * 3600 * 1000).unref();
+  }
   for (const signal of ['SIGTERM', 'SIGINT']) {
     process.on(signal, () => shutdown(signal));
   }

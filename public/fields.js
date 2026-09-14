@@ -102,6 +102,9 @@ export const steps = [
         min: 0.5,
         max: 4,
         step: 0.01,
+        // Unter dem Feld steht der heutige Preis aus der Marktquelle, sofern
+        // der Betreiber eine eingerichtet hat.
+        market: 'fuel',
       },
       { path: 'current.insurance', label: 'Versicherung pro Jahr', unit: 'EUR', type: 'number', min: 0, max: 6000, step: 10 },
       { path: 'current.tax', label: 'Kfz-Steuer pro Jahr', unit: 'EUR', type: 'number', min: 0, max: 2000, step: 5 },
@@ -156,7 +159,16 @@ export const steps = [
         step: 5,
         control: 'range',
       },
-      { path: 'ev.homePrice', label: 'Strompreis zu Hause', unit: 'EUR/kWh', type: 'number', min: 0, max: 1.5, step: 0.01 },
+      {
+        path: 'ev.homePrice',
+        label: 'Strompreis zu Hause',
+        unit: 'EUR/kWh',
+        type: 'number',
+        min: 0,
+        max: 1.5,
+        step: 0.01,
+        market: 'power',
+      },
       { path: 'ev.publicPrice', label: 'Preis öffentliches Laden', unit: 'EUR/kWh', type: 'number', min: 0, max: 1.5, step: 0.01 },
       {
         path: 'ev.chargingLossPct',

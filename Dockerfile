@@ -16,6 +16,8 @@ COPY --chown=node:node package.json ./
 COPY --chown=node:node shared/ ./shared/
 COPY --chown=node:node server/ ./server/
 COPY --chown=node:node public/ ./public/
+# Postleitzahlen-Koordinaten für die regionale Preisabfrage (GeoNames, CC BY 4.0).
+COPY --chown=node:node data/ ./data/
 
 USER node
 
