@@ -1,16 +1,26 @@
 {
-  "name": "ev-calculater",
-  "version": "1.0.0",
-  "description": "Rechner: Ab wann lohnt sich der Umstieg auf ein E-Auto?",
-  "type": "module",
+  "name": "ampmatch",
+  "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.18.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
-    "start": "node server/server.js",
-    "dev": "node --watch server/server.js",
-    "test": "node --test test/*.test.js"
+    "dev": "pnpm --filter @ampmatch/web dev",
+    "build": "pnpm --filter @ampmatch/web build",
+    "start": "pnpm --filter @ampmatch/web start",
+    "lint": "pnpm --filter @ampmatch/web lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @ampmatch/core test",
+    "test:e2e": "pnpm --filter @ampmatch/web test:e2e",
+    "daten:pruefen": "pnpm --filter @ampmatch/core daten:pruefen"
   },
-  "license": "MIT"
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver",
+      "sharp"
+    ]
+  }
 }

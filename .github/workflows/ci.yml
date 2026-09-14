@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typen
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Rechenkern und Fahrzeugdaten
+        run: pnpm test
+
+      - name: Bauen
+        run: pnpm build
+
+      - name: Browser für den Funneltest
+        run: pnpm --filter @ampmatch/web exec playwright install --with-deps chromium
+
+      - name: Funnelpfad
+        run: pnpm --filter @ampmatch/web exec playwright test
+        env:
+          CI: '1'
+
+      - name: Stand der Partnerlinks
+        run: node scripts/startpruefung.mjs --nur-bericht

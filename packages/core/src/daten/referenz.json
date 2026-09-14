@@ -1,0 +1,101 @@
+[
+  {
+    "id": "dacia-sandero-benzin",
+    "marke": "Dacia",
+    "modell": "Sandero TCe 90",
+    "listenpreisEur": 15300,
+    "verbrauchLPro100km": 5.7,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 70,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "opel-corsa-benzin",
+    "marke": "Opel",
+    "modell": "Corsa 1.2 Turbo 100",
+    "listenpreisEur": 22900,
+    "verbrauchLPro100km": 5.5,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 64,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "vw-polo-benzin",
+    "marke": "Volkswagen",
+    "modell": "Polo 1.0 TSI 95",
+    "listenpreisEur": 23500,
+    "verbrauchLPro100km": 5.6,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 66,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "vw-golf-benzin",
+    "marke": "Volkswagen",
+    "modell": "Golf 1.5 eTSI 116",
+    "listenpreisEur": 32500,
+    "verbrauchLPro100km": 5.8,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 78,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "skoda-karoq-benzin",
+    "marke": "Skoda",
+    "modell": "Karoq 1.5 TSI 150",
+    "listenpreisEur": 35600,
+    "verbrauchLPro100km": 6.3,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 104,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "skoda-octavia-kombi-diesel",
+    "marke": "Skoda",
+    "modell": "Octavia Combi 2.0 TDI 116",
+    "listenpreisEur": 38400,
+    "verbrauchLPro100km": 4.9,
+    "kraftstoff": "diesel",
+    "kfzSteuerEurProJahr": 272,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "vw-tiguan-benzin",
+    "marke": "Volkswagen",
+    "modell": "Tiguan 1.5 eTSI 130",
+    "listenpreisEur": 40900,
+    "verbrauchLPro100km": 6.6,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 116,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "peugeot-5008-benzin",
+    "marke": "Peugeot",
+    "modell": "5008 1.2 Hybrid 136 (7 Sitze)",
+    "listenpreisEur": 41500,
+    "verbrauchLPro100km": 5.9,
+    "kraftstoff": "benzin",
+    "kfzSteuerEurProJahr": 86,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  },
+  {
+    "id": "vw-passat-diesel",
+    "marke": "Volkswagen",
+    "modell": "Passat Variant 2.0 TDI 150",
+    "listenpreisEur": 48700,
+    "verbrauchLPro100km": 5.1,
+    "kraftstoff": "diesel",
+    "kfzSteuerEurProJahr": 284,
+    "quelle": "Listenpreis und WLTP kombiniert laut Herstellerkonfigurator",
+    "standDatum": "2026-09-01"
+  }
+]
