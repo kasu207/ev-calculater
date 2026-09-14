@@ -15,8 +15,11 @@ services:
 
     restart: unless-stopped
 
-    # Räumt Zombie-Prozesse ab und reicht Signale sauber an Node durch.
-    init: true
+    # Kein `init: true`. Es wuerde /sbin/docker-init in den Container mounten,
+    # was auf gehaerteten Hosts an "operation not permitted" scheitern kann.
+    # Gebraucht wird es hier ohnehin nicht: der Server behandelt SIGTERM und
+    # SIGINT selbst (siehe server/server.js) und startet keine Kindprozesse,
+    # die abgeraeumt werden muessten.
 
     environment:
       NODE_ENV: production

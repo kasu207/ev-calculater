@@ -158,6 +158,22 @@ docker compose logs --tail=30
 docker inspect --format '{{json .State.Health}}' ev-calculator
 ```
 
+**`exec /sbin/docker-init: operation not permitted`, Container startet immer neu.**
+Das tritt auf, wenn `init: true` gesetzt ist und der Host die Ausführung des
+eingehängten `docker-init` verweigert. Die Compose-Datei kommt bewusst ohne
+`init` aus – der Server behandelt SIGTERM und SIGINT selbst und startet keine
+Kindprozesse. Sollte die Zeile in einer eigenen Abwandlung wieder auftauchen,
+gehört sie hier wieder heraus.
+
+**Container startet nicht und die Härtung ist verdächtig.** Zum Eingrenzen
+`read_only`, `cap_drop` und `security_opt` vorübergehend auskommentieren und
+einzeln wieder zuschalten. Alle drei sind für den Betrieb nicht zwingend, aber
+sinnvoll – die Anwendung schreibt nichts und braucht keine Capabilities.
+
+**`WARN The "BIND_ADDR" variable is not set.`** Harmlos: die Variable ist
+optional. Wer die Meldung nicht sehen will, legt eine Datei `.env` mit der
+Zeile `BIND_ADDR=` an.
+
 **Port bereits belegt?** `ss -ltnp | grep 7000` zeigt, wer ihn hält. Ein anderer
 Host-Port lässt sich in `docker-compose.yml` unter `ports` eintragen.
 
