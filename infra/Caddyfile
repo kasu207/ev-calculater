@@ -1,0 +1,8 @@
+ampmatch.de, www.ampmatch.de {
+  encode zstd gzip
+  reverse_proxy web:9000
+}
+
+stats.ampmatch.de {
+  reverse_proxy umami:3000
+}

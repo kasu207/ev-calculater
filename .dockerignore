@@ -1,19 +1,9 @@
-.git
-.gitignore
-.github
-.claude
 node_modules
-test
-coverage
-README.md
-Dockerfile
-.dockerignore
-docker-compose.yml
-docker-compose.*.yml
+**/node_modules
+.next
+**/.next
+.git
+legacy
+playwright-report
+test-results
 *.log
-.env
-.env.*
-.DS_Store
-
-# Laufzeitdaten liegen im Volume, nicht im Image.
-data/
