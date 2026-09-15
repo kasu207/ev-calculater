@@ -6,9 +6,17 @@ FROM node:22-alpine
 
 ENV NODE_ENV=production \
     PORT=3000 \
-    HOST=0.0.0.0
+    HOST=0.0.0.0 \
+    DATA_DIR=/data
 
 WORKDIR /app
+
+# Ablage fuer Anfragen und Messwerte. Muss dem unprivilegierten Nutzer
+# gehoeren, bevor das Volume daraufgelegt wird: Docker uebernimmt Besitzer
+# und Rechte des Verzeichnisses im Image in das frisch angelegte Volume.
+# Ohne diesen Schritt startet der Container zwar, kann aber nichts schreiben.
+RUN mkdir -p /data && chown node:node /data
+VOLUME ["/data"]
 
 # Nur das, was der Server zur Laufzeit wirklich braucht.
 # Besitzer ist der im Basisimage vorhandene unprivilegierte Nutzer "node".

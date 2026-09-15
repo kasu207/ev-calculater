@@ -8,3 +8,7 @@ npm-debug.log*
 .env.local
 coverage/
 *.log
+
+# Anfragen und Messwerte. Enthalten personenbezogene Daten und gehoeren
+# niemals in die Versionsverwaltung.
+data/

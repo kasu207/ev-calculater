@@ -245,9 +245,11 @@ Nutzers, der Container ist jederzeit ersetzbar.
 | `GET /api/meta` | Vorgabewerte, Karosseriebezeichnungen, Stand der Fahrzeugdaten |
 | `GET /api/vehicles` | vollständige Fahrzeugdatenbank |
 | `POST /api/recommend` | Ranking, beste Gesamtempfehlung, wirtschaftlicher Sieger, Gegenszenario |
-| `POST /api/vehicle` | Einzelbewertung, Angebotsvarianten, Anfragetext |
+| `POST /api/vehicle` | Einzelbewertung, Angebotsvarianten, Anfragetext, Hebel, freigeschaltete Partner |
+| `POST /api/lead` | Anfrage eines Nutzers, wird unbestätigt gespeichert |
+| `POST /api/event` | cookielose Trichtermessung |
 
-Beide POST-Endpunkte erwarten `{ "input": { ... } }` in der Struktur aus
+Die POST-Endpunkte für Berechnungen erwarten `{ "input": { ... } }` in der Struktur aus
 `shared/defaults.js`; fehlende Felder werden mit den Vorgabewerten ergänzt.
 
 ```bash
@@ -256,18 +258,88 @@ curl -X POST http://localhost:3000/api/recommend \
   -d '{"input":{"scenario":"replace","profile":{"kmPerYear":25000}},"limit":5}'
 ```
 
+## Öffentliche Seiten
+
+Der Rechner selbst wird im Browser zusammengesetzt und ist für Suchmaschinen
+damit leer. Deshalb rendert der Server zusätzlich 36 vollständige Seiten aus
+derselben Rechenlogik - sie sind der Grund, warum das Projekt gefunden werden
+kann. Die Inhalte sind gerechnet, nicht getextet, und bleiben dadurch aktuell,
+wenn sich Fahrzeugdaten oder Annahmen ändern.
+
+| Pfad | Inhalt |
+| --- | --- |
+| `/e-auto` | Übersicht aller 28 Modelle mit Break-even |
+| `/e-auto/:modell` | Modellseite mit Break-even je Fahrleistung, Kostenverlauf, Daten |
+| `/fahrprofil/:n-km` | Rangliste für 5.000 bis 50.000 km im Jahr |
+| `/ergebnis/:zustand` | geteiltes Ergebnis, nicht indexiert |
+| `/sitemap.xml`, `/robots.txt` | für Suchmaschinen |
+| `/admin?token=…` | Trichter- und Ertragskennzahlen, nur mit `ADMIN_TOKEN` |
+| `/bestaetigen?token=…` | Double-Opt-in für E-Mail-Adressen |
+
+## Betriebsvariablen
+
+| Variable | Wirkung |
+| --- | --- |
+| `SITE_URL` | absolute Basis für Sitemap, geteilte Links und Bestätigungsmails |
+| `ADMIN_TOKEN` | schaltet `/admin` frei; ohne Token antwortet die Seite wie eine unbekannte Adresse |
+| `DATA_DIR` | Ablage für `leads.jsonl` und `events.jsonl` (Standard `./data`) |
+| `MAIL_WEBHOOK_URL` | Webhook eines Maildienstes; ohne Angabe landet die Mail nur im Log |
+| `MAIL_WEBHOOK_TOKEN` | optionales Bearer-Token für diesen Webhook |
+| `TRUST_PROXY` | wertet `X-Forwarded-For` aus - nur hinter einem vertrauenswürdigen Proxy setzen |
+
+## Datenschutz im Betrieb
+
+- Keine Cookies, keine Fremdskripte, keine Einbindung Dritter.
+- IP-Adressen werden nie gespeichert. Für Ratenbegrenzung und Besucherzählung
+  dient ein tagesrollierender, nicht zurückrechenbarer Hash im Arbeitsspeicher.
+- E-Mail-Adressen nur mit ausdrücklicher Einwilligung und erst nach
+  Bestätigung des zugesandten Links verwendbar.
+- Geteilte Ergebnislinks tragen die Rechenwerte in der Adresse und werden
+  nirgends gespeichert.
+- `public/impressum.html` und `public/datenschutz.html` sind **Vorlagen** und
+  müssen vor der Veröffentlichung ausgefüllt werden.
+
+## Ertragsquellen
+
+`shared/partners.js` hält die vergüteten Empfehlungen. Alle Einträge stehen auf
+`enabled: false` und zeigen auf Platzhalter-URLs. Ein Eintrag wird erst
+eingeschaltet, wenn ein echter Partnervertrag besteht und die eigene
+Partnerkennung hinterlegt ist.
+
+Ein Partnerhinweis erscheint ausschließlich an einem Hebel aus
+`shared/levers.js`, dessen Wirkung vorher durchgerechnet wurde - der Nutzen ist
+also belegt, bevor ein Link steht. Werbliche Verweise sind fest im Markup als
+Anzeige gekennzeichnet und tragen `rel="sponsored nofollow noopener"`.
+
+Die Reihenfolge der Fahrzeugempfehlungen wird von Vergütungen nicht beeinflusst.
+Sie ergibt sich ausschließlich aus der Berechnung in `shared/match.js`.
+
+Das Zahlenmodell dahinter steht in [GROWTH.md](GROWTH.md).
+
 ## Projektstruktur
 
 ```
-shared/      Rechenkern – von Server und Tests gemeinsam genutzt
+shared/      Rechenkern – von Server, Browser und Tests gemeinsam genutzt
   defaults.js    Vorgabewerte aller Eingaben
   vehicles.js    Fahrzeugdatenbank (28 Modelle)
   calc.js        Kostenvergleich, Restwerte, Preisprognose, Break-even
   match.js       Bewertung und Empfehlung
   offers.js      Kauf-, Finanzierungs- und Leasingmodell, Anfragetext
-server/      HTTP-Server und API, ohne Fremdbibliotheken
+  levers.js      gerechnete Wirkung von Tarif, Ladeanteil und THG-Quote
+  partners.js    Ertragsquellen, standardmäßig alle abgeschaltet
+  share.js       Kodierung des Eingabezustands für teilbare Links
+  seo.js         Inhalte der öffentlichen Seiten
+  format.js      Zahlen- und Datumsformate
+server/      HTTP-Server, API und serverseitiges Rendern
+  server.js      Routen, statische Auslieferung
+  pages.js       gerenderte Landing- und Ergebnisseiten
+  store.js       Anfragen, Ereignisse, Ratenbegrenzung
+  notify.js      Versandnaht für Bestätigungsmails
+  admin.js       Kennzahlen-Übersicht
 public/      Frontend (ES-Module, SVG-Diagramme ohne Chartbibliothek)
+  conversion.js  Hebel-, Anfrage- und Teilen-Bausteine
 test/        Tests mit dem Node-Testrunner
+GROWTH.md    Zahlenmodell und Reihenfolge der nächsten Schritte
 Dockerfile
 docker-compose.yml
 ```

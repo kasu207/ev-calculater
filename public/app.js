@@ -4,8 +4,10 @@
  */
 
 import { steps, replacementFields, pricePresets } from './fields.js';
-import { money, moneyExact, signedMoney, number, decimal, duration, km } from './format.js';
+import { money, moneyExact, signedMoney, number, decimal, duration, km } from '../shared/format.js';
 import { renderCostLineChart, renderAnnualBars, renderScoreMeter } from './charts.js';
+import { leversBlock, shareBlock, leadBlock } from './conversion.js';
+import { encodeInput, decodeInput } from '../shared/share.js';
 
 const STORAGE_KEY = 'ev-calculator-input-v1';
 const THEME_KEY = 'ev-calculator-theme';
@@ -19,9 +21,46 @@ const state = {
   detail: null,
   selectedComparison: null,
   pending: false,
+  // Einstieg über einen geteilten Link - wird für die Messung festgehalten.
+  fromSharedLink: false,
 };
 
 const $ = (sel) => document.querySelector(sel);
+
+/* ------------------------------------------------------------- Messung */
+
+const tracked = new Set();
+
+/**
+ * Cookielose Messung. Ohne Zahlen ist jede Änderung an dieser Seite geraten.
+ * Gesendet wird nur der Ereignisname und ein paar kurze Kennwerte, nie eine
+ * Eingabe des Nutzers. Fehlschläge werden verschluckt - eine Messung darf
+ * die Seite unter keinen Umständen stören.
+ */
+function track(name, props = {}, { once = false } = {}) {
+  if (once) {
+    const key = `${name}:${JSON.stringify(props)}`;
+    if (tracked.has(key)) return;
+    tracked.add(key);
+  }
+  try {
+    const payload = JSON.stringify({ name, props });
+    // sendBeacon überlebt einen Seitenwechsel, fetch ist der Rückfallweg.
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/event', new Blob([payload], { type: 'application/json' }));
+    } else {
+      fetch('/api/event', { method: 'POST', headers: { 'content-type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+    }
+  } catch {
+    /* Messung ist nie wichtig genug, um etwas kaputtzumachen */
+  }
+}
+
+/** Aktueller Zustand als teilbarer Link. */
+function shareUrl() {
+  const code = encodeInput(state.input, state.selectedVehicleId);
+  return `${location.origin}/ergebnis${code ? `/${code}` : ''}`;
+}
 
 /* ----------------------------------------------------------------- Helfer */
 
@@ -638,6 +677,12 @@ function renderResult() {
     </section>
 
     <section class="panel" id="detailPanel">${detailBlock()}</section>
+
+    <div id="leverSlot">${state.detail ? leversBlock(state.detail.levers, state.detail.partners) : ''}</div>
+
+    ${leadBlock(best ? best.label : '')}
+
+    ${shareBlock(shareUrl())}
   `;
 
   if (best) {
@@ -653,6 +698,19 @@ function renderDetailPanel() {
   if (!panel) return;
   panel.innerHTML = detailBlock();
   if (state.detail) renderAnnualBars($('#annualChart'), state.detail.evaluation.comparison);
+
+  // Die Hebel hängen am ausgewählten Fahrzeug und müssen deshalb mitwandern.
+  // Das Fach bleibt beim Neuzeichnen des Ergebnisses stehen, auch wenn die
+  // Details noch geladen werden - sonst gibt es beim Nachliefern nichts, in
+  // das sie geschrieben werden könnten.
+  const slot = $('#leverSlot');
+  if (slot && state.detail) {
+    slot.innerHTML = leversBlock(state.detail.levers, state.detail.partners);
+    track('lever_view', { v: state.selectedVehicleId || '' }, { once: true });
+  }
+
+  const share = $('#shareUrl');
+  if (share) share.value = shareUrl();
 }
 
 let resultObserver = null;
@@ -724,6 +782,8 @@ async function recompute({ keepSelection = true } = {}) {
     renderResult();
     renderLivebar();
     persist();
+    // Einmal je Sitzung: das Ergebnis ist der Bezugspunkt aller Quoten.
+    track('result', { v: state.selectedVehicleId || 'keins' }, { once: true });
     await loadDetail();
   } catch (err) {
     $('#result').hidden = false;
@@ -893,6 +953,8 @@ function bindEvents() {
       setTimeout(() => {
         button.textContent = 'Text kopieren';
       }, 2000);
+      // Der stärkste Kaufabsichtsindikator, den die Seite kennt.
+      track('inquiry_copy', { v: state.selectedVehicleId || '' });
     }
   });
 
@@ -926,6 +988,99 @@ function bindEvents() {
       renderCostLineChart($('#lineChart'), state.selectedComparison);
     }
   }, 200));
+
+  bindConversionEvents();
+}
+
+/**
+ * Alles, was aus dem Ergebnis eine Handlung macht. Die Zuhörer hängen am
+ * Dokument, nicht an einzelnen Elementen: das Ergebnis wird bei jeder
+ * Eingabe neu gezeichnet, einzeln gebundene Zuhörer wären danach verwaist.
+ */
+function bindConversionEvents() {
+  document.addEventListener('click', async (event) => {
+    const partner = event.target.closest('[data-partner]');
+    if (partner) {
+      // Vor dem Verlassen der Seite messen, sonst geht das Ereignis verloren.
+      track('partner_click', { partner: partner.dataset.partner, v: state.selectedVehicleId || '' });
+      return;
+    }
+
+    if (event.target.closest('#shareBtn')) {
+      const url = shareUrl();
+      const input = $('#shareUrl');
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: 'Mein E-Auto-Ergebnis', url });
+        } else {
+          await navigator.clipboard.writeText(url);
+        }
+        const btn = $('#shareBtn');
+        btn.textContent = 'Kopiert';
+        setTimeout(() => (btn.textContent = 'Link kopieren'), 2000);
+      } catch {
+        // Freigabe abgebrochen oder Zwischenablage gesperrt: markieren,
+        // dann kann der Nutzer von Hand kopieren.
+        input?.select();
+      }
+      track('share', { v: state.selectedVehicleId || '' });
+    }
+  });
+
+  // Das Öffnen des Formulars ist der eigentliche Absprungpunkt im Trichter.
+  document.addEventListener('focusin', (event) => {
+    if (event.target.closest('#leadForm')) {
+      track('lead_open', { v: state.selectedVehicleId || '' }, { once: true });
+    }
+  });
+
+  document.addEventListener('submit', async (event) => {
+    if (!event.target.matches('#leadForm')) return;
+    event.preventDefault();
+
+    const form = event.target;
+    const status = $('#leadStatus');
+    const button = $('#leadSubmit');
+    const email = form.email.value.trim();
+
+    if (!email.includes('@')) {
+      status.textContent = 'Bitte prüfen Sie die E-Mail-Adresse.';
+      status.className = 'leadbox__status leadbox__status--error';
+      form.email.focus();
+      return;
+    }
+    if (!form.consent.checked) {
+      status.textContent = 'Ohne Ihre Einwilligung dürfen wir nichts senden.';
+      status.className = 'leadbox__status leadbox__status--error';
+      $('#leadConsent').focus();
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'Wird gesendet ...';
+    status.className = 'leadbox__status';
+
+    try {
+      const purpose = form.querySelector('input[name="purpose"]:checked')?.value || 'result';
+      const data = await api('/api/lead', {
+        email,
+        consent: true,
+        purpose,
+        vehicleId: state.selectedVehicleId,
+        share: encodeInput(state.input, state.selectedVehicleId),
+        website: form.website.value,
+      });
+      status.textContent = data.message || 'Bitte bestätigen Sie den Link in der E-Mail.';
+      status.className = 'leadbox__status leadbox__status--ok';
+      form.reset();
+      track('lead_submit', { purpose, v: state.selectedVehicleId || '' });
+    } catch (err) {
+      status.textContent = err.message || 'Das hat nicht geklappt. Bitte später erneut versuchen.';
+      status.className = 'leadbox__status leadbox__status--error';
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
 
 function applyTheme(theme) {
@@ -933,6 +1088,34 @@ function applyTheme(theme) {
   const btn = $('#themeToggle');
   btn.textContent = theme === 'dark' ? 'Helles Design' : 'Dunkles Design';
   btn.setAttribute('aria-pressed', String(theme === 'dark'));
+}
+
+/**
+ * Zustand aus der Adresse übernehmen. Zwei Einstiege:
+ * - `/?v=modell-id` von einer Landingpage: nur das Fahrzeug vorwählen.
+ * - `/#kodierter-zustand` aus einem geteilten Link: alle Werte übernehmen.
+ *
+ * Ein geteilter Link hat Vorrang vor dem, was im Browser gespeichert liegt -
+ * sonst würde der Empfänger fremde Zahlen mit den eigenen vermischt sehen.
+ */
+function applyUrlState(defaults) {
+  const params = new URLSearchParams(location.search);
+  const hash = location.hash.replace(/^#/, '');
+
+  if (hash) {
+    try {
+      const { input, vehicleId } = decodeInput(hash);
+      state.input = { ...structuredClone(defaults), ...input };
+      if (vehicleId) state.selectedVehicleId = vehicleId;
+      state.fromSharedLink = true;
+      return;
+    } catch {
+      /* unbrauchbarer Link: die gespeicherten Werte bleiben bestehen */
+    }
+  }
+
+  const vehicle = params.get('v');
+  if (vehicle && /^[a-z0-9-]{1,40}$/.test(vehicle)) state.selectedVehicleId = vehicle;
 }
 
 /* -------------------------------------------------------------------- Start */
@@ -949,6 +1132,7 @@ async function init() {
     const meta = await api('/api/meta');
     state.bodyLabels = meta.bodyLabels;
     state.input = restore(meta.defaults);
+    applyUrlState(meta.defaults);
     const vintage = $('#dataVintage');
     if (vintage) vintage.textContent = `${meta.dataVintage}, ${meta.vehicleCount} Modelle`;
   } catch (err) {
@@ -961,7 +1145,8 @@ async function init() {
 
   renderWizard();
   bindEvents();
-  await recompute({ keepSelection: false });
+  track('view', { path: location.pathname, shared: state.fromSharedLink ? '1' : '0' });
+  await recompute({ keepSelection: Boolean(state.selectedVehicleId) });
 }
 
 init();

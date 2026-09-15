@@ -27,6 +27,33 @@ services:
       HOST: 0.0.0.0
       TZ: Europe/Berlin
 
+      # Absolute Basis fuer Links in Sitemap, Landingpages und
+      # Bestaetigungsmails. Ohne die echte Domain zeigen geteilte Links und
+      # der Bestaetigungslink ins Leere.
+      SITE_URL: ${SITE_URL:-http://localhost:7000}
+
+      # Hinter einem Reverse Proxy setzen, damit die Ratenbegrenzung die
+      # tatsaechliche Client-IP sieht statt der des Proxys. Nur setzen, wenn
+      # wirklich ein vertrauenswuerdiger Proxy davorsteht - sonst kann sich
+      # jeder Client seine IP selbst aussuchen.
+      TRUST_PROXY: ${TRUST_PROXY:-}
+
+      # Zugang zur Auswertung unter /admin?token=... Ohne Token ist die Seite
+      # abgeschaltet und antwortet wie eine unbekannte Adresse.
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+
+      # Webhook eines Maildienstes fuer den Bestaetigungslink. Ohne diese
+      # Angabe landet die Nachricht nur im Log.
+      MAIL_WEBHOOK_URL: ${MAIL_WEBHOOK_URL:-}
+      MAIL_WEBHOOK_TOKEN: ${MAIL_WEBHOOK_TOKEN:-}
+
+      DATA_DIR: /data
+
+    # Anfragen und Messwerte muessen einen Neustart ueberleben - sie sind der
+    # einzige Teil des Systems, der sich nicht neu berechnen laesst.
+    volumes:
+      - ev-data:/data
+
     healthcheck:
       test:
         - CMD
@@ -55,3 +82,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  ev-data:

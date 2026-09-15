@@ -14,3 +14,6 @@ docker-compose.*.yml
 .env
 .env.*
 .DS_Store
+
+# Laufzeitdaten liegen im Volume, nicht im Image.
+data/

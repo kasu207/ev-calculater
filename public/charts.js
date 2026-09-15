@@ -7,7 +7,7 @@
  * Diese Zuordnung gilt in allen Diagrammen und in der Legende.
  */
 
-import { money, number, decimal } from './format.js';
+import { money, number, decimal } from '../shared/format.js';
 
 /** Achsenbeschriftung im kompakten Modus: 40.000 EUR wird zu "40 Tsd.". */
 function shortMoney(value) {
