@@ -88,6 +88,15 @@ dem FlexOffers-Reporting und wird montags von Hand nachgetragen.
 
 Details und die Einrichtung des Funnels in Umami: `docs/messung.md`.
 
+## Auf dem eigenen Server anschauen
+
+```bash
+docker compose -f infra/compose.vorschau.yaml up -d --build   # dann Port 9001
+```
+
+Baut aus dem ausgecheckten Stand, ohne Registry und ohne TLS. Einzelheiten in
+`docs/betrieb.md`.
+
 ## Betrieb
 
 Docker Compose auf einem Hetzner CX22, Anwendung intern auf Port 9000, davor
