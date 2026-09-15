@@ -1,0 +1,44 @@
+# Reverse Proxy mit automatischem TLS-Zertifikat.
+#
+# Caddy holt und erneuert das Let's-Encrypt-Zertifikat selbsttaetig, sobald
+# der DNS-A-Eintrag der Domain auf diesen Server zeigt und die Ports 80 und
+# 443 offen sind. Deshalb hier und nicht nginx: kein certbot, kein Cronjob,
+# keine Erneuerung, die irgendwann stillschweigend ausfaellt.
+#
+#   sudo cp deploy/Caddyfile.example /etc/caddy/Caddyfile
+#   sudo nano /etc/caddy/Caddyfile      # Domain eintragen
+#   sudo systemctl reload caddy
+
+beispiel.de, www.beispiel.de {
+	# 7000 ist der Port aus docker-compose.yml. Mit BIND_ADDR=127.0.0.1 in
+	# der .env ist er ausschliesslich lokal erreichbar.
+	reverse_proxy 127.0.0.1:7000
+
+	encode zstd gzip
+
+	header {
+		# Verhindert, dass die Seite in einem fremden Rahmen laeuft.
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# Die Anwendung laedt keine Fremdskripte und bindet nichts ein.
+		# Wird spaeter ein externes Skript noetig, ist diese Zeile der
+		# Ort, an dem es ausdruecklich erlaubt werden muss.
+		#
+		# style-src braucht 'unsafe-inline': die Balken in den Diagrammen
+		# und in der Bewertung setzen ihre Breite ueber ein
+		# style-Attribut, weil der Wert erst zur Laufzeit feststeht.
+		# Ohne diese Erlaubnis bleiben alle Balken leer - geprueft, nicht
+		# vermutet. Bei style-src ist das vertretbar; bei script-src
+		# waere es das nicht, deshalb steht es dort auch nicht.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/ev-calculator.log {
+			roll_size 10MiB
+			roll_keep 3
+		}
+	}
+}

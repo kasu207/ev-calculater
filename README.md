@@ -105,6 +105,76 @@ npm test           # 35 Tests: Rechenkern und HTTP-Schicht
 Port und Adresse sind über `PORT` und `HOST` einstellbar. Es werden keine Pakete
 installiert – Node 18 oder neuer genügt.
 
+## Onlinestellen: der kurze Weg
+
+Reihenfolge, weil zwei Schritte voneinander abhängen: Das TLS-Zertifikat wird
+erst ausgestellt, wenn der DNS-Eintrag bereits auf den Server zeigt.
+
+```bash
+# 1. DNS: A-Eintrag beispiel.de -> Server-IP. Erst danach weiter.
+#    Prüfen: dig +short beispiel.de
+
+# 2. Projekt holen und Konfiguration anlegen
+git clone https://github.com/kasu207/ev-calculater.git
+cd ev-calculater
+cp .env.example .env
+openssl rand -hex 24          # Ergebnis als ADMIN_TOKEN in die .env
+nano .env                     # SITE_URL und ADMIN_TOKEN ausfüllen
+
+# 3. Starten
+docker compose up -d --build
+curl http://127.0.0.1:7000/api/health
+
+# 4. Reverse Proxy mit automatischem Zertifikat
+sudo apt install caddy
+sudo cp deploy/Caddyfile.example /etc/caddy/Caddyfile
+sudo nano /etc/caddy/Caddyfile  # Domain eintragen
+sudo systemctl reload caddy
+
+# 5. Nur 80 und 443 nach außen öffnen
+sudo ufw allow 80,443/tcp && sudo ufw enable
+```
+
+Mit `BIND_ADDR=127.0.0.1` in der `.env` ist Port 7000 ausschließlich lokal
+erreichbar – von außen kommt man nur über den Proxy herein.
+
+### Abnahme
+
+```bash
+curl -I https://beispiel.de/                      # 200, gültiges Zertifikat
+curl -s https://beispiel.de/sitemap.xml | head -5 # muss die echte Domain zeigen
+curl -s https://beispiel.de/e-auto/vw-id3 | grep canonical
+curl -s -o /dev/null -w '%{http_code}\n' https://beispiel.de/admin   # 404 ohne Token
+```
+
+Zeigt die Sitemap `http://localhost:7000`, ist `SITE_URL` nicht gesetzt oder der
+Container lief schon vorher: `docker compose up -d --force-recreate`.
+
+### Danach
+
+1. **Impressum und Datenschutzerklärung ausfüllen.** Beide liegen als Vorlage in
+   `public/`. Ein fehlendes Impressum ist abmahnfähig, bevor der erste Euro
+   fließt.
+2. **Sitemap in der Google Search Console einreichen**
+   (`https://beispiel.de/sitemap.xml`). Erste Platzierungen brauchen
+   erfahrungsgemäß sechs bis zwölf Wochen.
+3. **Maildienst anschließen** (`MAIL_WEBHOOK_URL`). Ohne ihn bleibt jede
+   Adresse unbestätigt und damit unbrauchbar.
+4. **Sichern.** Alles außer den Anfragen lässt sich neu berechnen:
+   ```bash
+   docker run --rm -v ev-calculater_ev-data:/data -v "$PWD":/sicherung alpine \
+     tar czf /sicherung/ev-data-$(date +%F).tar.gz -C /data .
+   ```
+
+### Aktualisieren
+
+```bash
+git pull && docker compose up -d --build
+```
+
+Das Volume `ev-data` bleibt dabei erhalten; Anfragen und Messwerte überleben
+den Neustart.
+
 ## Deployment mit Docker Compose
 
 Auf dem Server läuft die Anwendung auf **Port 7000**; im Container lauscht sie
@@ -113,6 +183,7 @@ intern auf 3000.
 ```bash
 git clone https://github.com/kasu207/ev-calculater.git
 cd ev-calculater
+cp .env.example .env    # SITE_URL und ADMIN_TOKEN eintragen
 docker compose up -d --build
 ```
 
