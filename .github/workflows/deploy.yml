@@ -2,7 +2,9 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    # Der Standardbranch des Repositories heisst noch nicht main. Beide Namen
+    # stehen hier, damit der Deploy auch nach einer Umbenennung greift.
+    branches: [main, claude/e-auto-calculator-wa2cmt]
   workflow_dispatch:
 
 concurrency:
