@@ -52,6 +52,9 @@ export default function Wurzellayout({ children }: { children: React.ReactNode }
           <main className="flex-1">{children}</main>
 
           <footer className="tabellenschrift mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-rule pt-4 text-[13px] text-muted">
+            <Link className="text-muted underline underline-offset-2" href="/e-auto">
+              Alle Modelle
+            </Link>
             <Link className="text-muted underline underline-offset-2" href="/impressum">
               Impressum
             </Link>

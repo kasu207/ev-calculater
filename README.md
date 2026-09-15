@@ -12,15 +12,16 @@ CMS, Feature-Flags, Abschluss im Interface, Preis-Scraping, Widget, API.
 
 ```
 apps/web/            Next.js, App Router, Tailwind mit eigener Token-Schicht
-  app/               Seiten, Vorschaubild, Health-Route, Rechtstexte
+  app/               Rechner, oeffentliche Seiten, Vorschaubild, Health, Rechtstexte
   components/        Eingabe, Verdikt, Kostenverlauf, Annahmen, CTA
-  lib/               Parameter, Partnerlinks, Messung, Formatierung
+  components/flaeche Bausteine der oeffentlichen Seiten, ohne JavaScript
+  lib/               Parameter, Partnerlinks, Messung, Formatierung, Flaeche
   styles/tokens.css  Farben, Radien, Linien
   assets/            Schriftinstanzen nur für das Vorschaubild
 packages/core/       Rechenkern, Zod-Schemata, Fahrzeugdaten, Tests
 infra/               Dockerfile, Compose, Caddy, Sicherung, Deploy
 scripts/             Startprüfung vor dem ersten öffentlichen Aufruf
-docs/                Pflegeanleitungen und Checklisten
+docs/                Pflegeanleitungen, Checklisten, Wachstum
 legacy/              Der frühere Rechner ohne Framework, nicht mehr im Einsatz
 ```
 
@@ -82,6 +83,31 @@ keines, ist `breakEvenJahr` null, und die Oberfläche sagt das in einem Satz.
 Die Standardannahmen stehen in `packages/core/src/annahmen.ts`. Jede Änderung
 dort verschiebt jedes Ergebnis, deshalb gehört eine Quelle in den Pull Request.
 
+## Öffentliche Seiten
+
+Der Rechner ist eine Adresse, deren Inhalt an zwei Parametern hängt; der
+Canonical-Tag zeigt bewusst immer auf `/`. Für eine Suchmaschine war das genau
+eine Seite – und damit gab es keinen Weg auf die Seite außer dem, den man schon
+kennt. Aus denselben Daten und derselben Rechnung entstehen deshalb beim Bauen
+statische Seiten zu den beiden Fragen, die Menschen tatsächlich eintippen:
+
+| Pfad | Inhalt | Anzahl |
+| --- | --- | --- |
+| `/e-auto` | Verzeichnis aller Modelle | 1 |
+| `/e-auto/[modell]` | Break-even je Fahrleistung, Zahlen dahinter, Nachbarmodelle | 20 |
+| `/fahrleistung/[n]-km` | Rangliste aller Modelle bei dieser Fahrleistung | 6 |
+
+Die beiden Achsen stehen senkrecht zueinander – die eine hält das Modell fest
+und variiert die Fahrleistung, die andere umgekehrt. Dadurch wiederholt keine
+Seite den Inhalt einer anderen. Ein dritter Schnitt je Modell *und*
+Fahrleistung ergäbe 120 Adressen, von denen jede eine Tabellenzeile einer
+bestehenden Seite wäre; das ist bewusst nicht gebaut.
+
+Ein neues Fahrzeug in `fahrzeuge.json` bringt eine neue Seite mit und ergänzt
+alle sechs Fahrleistungsseiten. Es gibt kein CMS und keinen Text zu pflegen.
+
+Hintergrund und Reihenfolge der nächsten Schritte: `docs/wachstum.md`.
+
 ## Messung
 
 Feste Ereignisnamen, keine spontanen Varianten:
@@ -94,6 +120,11 @@ Feste Ereignisnamen, keine spontanen Varianten:
 | `offer_cta_viewed` | CTA zu 50 % sichtbar für mindestens eine Sekunde |
 | `offer_cta_clicked` | Primärmetrik |
 | `partner_redirect` | Weiterleitung ausgelöst |
+
+`offer_cta_viewed`, `offer_cta_clicked` und `partner_redirect` tragen zusätzlich
+`seitenart` mit `rechner`, `modell` oder `fahrleistung`. Ohne diese Angabe ließe
+sich nicht beantworten, ob die öffentlichen Seiten Anfragen erzeugen oder nur
+Aufrufe.
 
 Gate-Metrik ist `offer_cta_clicked / calc_completed`. `lead_confirmed` kommt aus
 dem FlexOffers-Reporting und wird montags von Hand nachgetragen.

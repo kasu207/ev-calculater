@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { EREIGNIS, budgetKlasse, kmKlasse, melde } from '@/lib/messung';
+import type { Seitenart } from '@/lib/messung';
 import type { Eingabe } from '@ampmatch/core';
 
 type Props = {
@@ -9,13 +10,19 @@ type Props = {
   beschriftung: string;
   href: string;
   eingabe: Eingabe;
+  /**
+   * Von welcher Seitenart der Klick kommt. Ohne diese Angabe laesst sich nicht
+   * beantworten, ob die oeffentlichen Seiten Umsatz bringen oder nur Aufrufe -
+   * und das ist die Frage, an der die naechste Entscheidung haengt.
+   */
+  seitenart?: Seitenart;
 };
 
 /**
  * Der Klick auf diese Flaeche ist die Primaermetrik des Sprints. Deshalb steht
  * hier auch die Sichtbarkeitsmessung: 50 Prozent der Flaeche, mindestens eine Sekunde.
  */
-export function PartnerCta({ modellId, beschriftung, href, eingabe }: Props) {
+export function PartnerCta({ modellId, beschriftung, href, eingabe, seitenart = 'rechner' }: Props) {
   const flaeche = useRef<HTMLAnchorElement>(null);
   const gemeldet = useRef(false);
 
@@ -31,7 +38,7 @@ export function PartnerCta({ modellId, beschriftung, href, eingabe }: Props) {
           uhr = setTimeout(() => {
             if (gemeldet.current) return;
             gemeldet.current = true;
-            melde(EREIGNIS.ctaGesehen, { modellId });
+            melde(EREIGNIS.ctaGesehen, { modellId, seitenart });
             beobachter.disconnect();
           }, 1000);
         }
@@ -48,7 +55,7 @@ export function PartnerCta({ modellId, beschriftung, href, eingabe }: Props) {
       if (uhr) clearTimeout(uhr);
       beobachter.disconnect();
     };
-  }, [modellId]);
+  }, [modellId, seitenart]);
 
   return (
     <a
@@ -61,6 +68,7 @@ export function PartnerCta({ modellId, beschriftung, href, eingabe }: Props) {
       onClick={() => {
         const daten = {
           modellId,
+          seitenart,
           kmBucket: kmKlasse(eingabe.kmProJahr),
           budgetBucket: budgetKlasse(eingabe.budgetEur),
         };

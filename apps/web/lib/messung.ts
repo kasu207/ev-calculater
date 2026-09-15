@@ -13,6 +13,13 @@ export const EREIGNIS = {
   weiterleitung: 'partner_redirect',
 } as const;
 
+/**
+ * Woher ein Ereignis kommt. Der Rechner und die oeffentlichen Seiten teilen
+ * sich dieselben Ereignisnamen - ohne diese Unterscheidung waere nicht zu
+ * sehen, welche Seitenart tatsaechlich Anfragen erzeugt.
+ */
+export type Seitenart = 'rechner' | 'modell' | 'fahrleistung';
+
 const INTERN_SCHLUESSEL = 'ampmatch.intern';
 
 type UmamiFenster = Window & {
