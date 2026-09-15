@@ -38,6 +38,8 @@ export function annahmenGueltig(a: Annahmen): boolean {
     zahlIn(kraftstoff?.benzin, Number.MIN_VALUE, Number.MAX_VALUE) &&
     zahlIn(kraftstoff?.diesel, Number.MIN_VALUE, Number.MAX_VALUE) &&
     zahlIn(a.realaufschlagAnteil, 0, 1) &&
+    zahlIn(a.wertverlustElektrischProJahr, 0, 1) &&
+    zahlIn(a.wertverlustVerbrennerProJahr, 0, 1) &&
     ganzZahlIn(a.haltedauerJahre, 1, 20)
   );
 }

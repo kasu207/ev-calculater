@@ -20,6 +20,15 @@ export type Empfehlung = {
   annahmen: Annahmen;
 };
 
+/**
+ * Restwert nach `jahre` Jahren, geometrisch: ein gleichbleibender Prozentsatz
+ * auf den jeweils verbliebenen Wert. Linear waere einfacher und falsch - ein
+ * Auto verliert im ersten Jahr deutlich mehr als im dritten.
+ */
+export function restwert(listenpreisEur: number, wertverlustProJahr: number, jahre: number): number {
+  return listenpreisEur * Math.pow(1 - wertverlustProJahr, jahre);
+}
+
 /** Mischpreis aus Heim- und Ladesaeulenstrom. */
 export function effektiverStrompreis(a: Annahmen): number {
   return (
@@ -45,7 +54,16 @@ export function jahreskostenVerbrenner(r: Referenz, kmProJahr: number, a: Annahm
 
 /**
  * Kumulierte Kosten beider Seiten ueber die Haltedauer, auf ganze Euro gerundet.
- * Jahr 0 ist der Kaufzeitpunkt: nur die Anschaffung zum Listenpreis.
+ *
+ * Gerechnet wird, was das Auto bis zum Jahr N wirklich gekostet hat, wenn man
+ * es dann verkauft: Anschaffung minus Restwert plus die laufenden Kosten.
+ * Deshalb starten beide Reihen im Jahr 0 bei null - da ist noch nichts
+ * verloren. Erst der Wertverlust laesst sie auseinanderlaufen.
+ *
+ * Das ist der Unterschied zur frueheren Fassung, die den Listenpreis als
+ * versunkenen Betrag stehen liess. Sie zeigte dadurch einen Abstand, den kein
+ * Verbrauchsvorteil in drei Jahren einholen konnte - und liess die groesste
+ * Position der Rechnung ganz aus.
  */
 export function vergleichen(
   f: Fahrzeug,
@@ -58,15 +76,24 @@ export function vergleichen(
 
   const jahresreihe: Jahrespunkt[] = [];
   for (let jahr = 0; jahr <= a.haltedauerJahre; jahr += 1) {
+    const wertverlustElektrisch =
+      f.listenpreisEur - restwert(f.listenpreisEur, a.wertverlustElektrischProJahr, jahr);
+    const wertverlustVerbrenner =
+      r.listenpreisEur - restwert(r.listenpreisEur, a.wertverlustVerbrennerProJahr, jahr);
+
     jahresreihe.push({
       jahr,
-      kumuliertElektrisch: Math.round(f.listenpreisEur + jahr * proJahrElektrisch),
-      kumuliertVerbrenner: Math.round(r.listenpreisEur + jahr * proJahrVerbrenner),
+      kumuliertElektrisch: Math.round(wertverlustElektrisch + jahr * proJahrElektrisch),
+      kumuliertVerbrenner: Math.round(wertverlustVerbrenner + jahr * proJahrVerbrenner),
     });
   }
 
   const ende = jahresreihe[jahresreihe.length - 1]!;
-  const treffer = jahresreihe.find((p) => p.kumuliertElektrisch <= p.kumuliertVerbrenner);
+  // Ab Jahr 1 gesucht: im Jahr 0 stehen beide Seiten zwangslaeufig bei null,
+  // ein Treffer dort waere kein Ergebnis, sondern ein Artefakt des Anfangs.
+  const treffer = jahresreihe
+    .slice(1)
+    .find((p) => p.kumuliertElektrisch <= p.kumuliertVerbrenner);
 
   return {
     modellId: f.id,

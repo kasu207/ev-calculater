@@ -4,6 +4,7 @@ import {
   empfehlen,
   empfehlenAus,
   jahreskostenElektrisch,
+  restwert,
   vergleichen,
 } from '../src/berechnung';
 import { fahrzeuge, guenstigstesFahrzeug, referenzNachId } from '../src/daten';
@@ -50,13 +51,36 @@ const annahmen: Annahmen = { ...STANDARD_ANNAHMEN };
 const langerZeitraum: Annahmen = { ...STANDARD_ANNAHMEN, haltedauerJahre: 8 };
 
 describe('vergleichen', () => {
-  it('startet im Jahr 0 mit den reinen Listenpreisen', () => {
+  it('startet im Jahr 0 auf beiden Seiten bei null', () => {
+    // Im Kaufzeitpunkt ist noch nichts verloren: gezahlt ist der Listenpreis,
+    // dafuer steht ein Auto in derselben Hoehe da.
     const v = vergleichen(fahrzeug(), referenz, { kmProJahr: 15000, budgetEur: 50000 }, annahmen);
     expect(v.jahresreihe[0]).toEqual({
       jahr: 0,
-      kumuliertElektrisch: 36000,
-      kumuliertVerbrenner: 30000,
+      kumuliertElektrisch: 0,
+      kumuliertVerbrenner: 0,
     });
+  });
+
+  it('rechnet den Wertverlust geometrisch auf den verbliebenen Wert', () => {
+    expect(restwert(30000, 0.2, 0)).toBe(30000);
+    expect(restwert(30000, 0.2, 1)).toBeCloseTo(24000, 6);
+    expect(restwert(30000, 0.2, 2)).toBeCloseTo(19200, 6);
+    // Linear waeren es im zweiten Jahr 18000 - der geometrische Verlauf liegt
+    // darueber, weil der Prozentsatz auf einen kleineren Wert wirkt.
+    expect(restwert(30000, 0.2, 2)).toBeGreaterThan(30000 - 2 * 0.2 * 30000);
+  });
+
+  it('macht den Wertverlust zum groessten Posten der Rechnung', () => {
+    const e = { kmProJahr: 15000, budgetEur: 50000 };
+    const v = vergleichen(fahrzeug(), referenz, e, annahmen);
+    const wertverlust =
+      36000 - restwert(36000, annahmen.wertverlustElektrischProJahr, annahmen.haltedauerJahre);
+    const laufend =
+      annahmen.haltedauerJahre * jahreskostenElektrisch(fahrzeug(), e.kmProJahr, annahmen);
+
+    expect(wertverlust).toBeGreaterThan(laufend);
+    expect(v.jahresreihe.at(-1)?.kumuliertElektrisch).toBe(Math.round(wertverlust + laufend));
   });
 
   it('liefert eine Reihe ueber die volle Haltedauer', () => {
@@ -79,19 +103,23 @@ describe('vergleichen', () => {
     expect(Number.isInteger(v.differenzGesamtEur)).toBe(true);
   });
 
-  it('rechnet ohne Fahrleistung nur Anschaffung, Steuer und THG-Quote', () => {
+  it('rechnet ohne Fahrleistung nur Wertverlust, Steuer und THG-Quote', () => {
     const v = vergleichen(fahrzeug(), referenz, { kmProJahr: 0, budgetEur: 50000 }, annahmen);
     // Ohne Fahrleistung bleiben je Jahr 100 Euro Steuer auf der Verbrennerseite
-    // und 70 Euro THG-Gutschrift auf der elektrischen.
+    // und 70 Euro THG-Gutschrift auf der elektrischen - dazu der Wertverlust,
+    // der auch im Stand anfaellt.
     const jahre = annahmen.haltedauerJahre;
-    const elektrisch = 36000 - jahre * 70;
-    const verbrenner = 30000 + jahre * 100;
+    const elektrisch = Math.round(
+      36000 - restwert(36000, annahmen.wertverlustElektrischProJahr, jahre) - jahre * 70,
+    );
+    const verbrenner = Math.round(
+      30000 - restwert(30000, annahmen.wertverlustVerbrennerProJahr, jahre) + jahre * 100,
+    );
     expect(v.jahresreihe.at(-1)).toEqual({
       jahr: jahre,
       kumuliertElektrisch: elektrisch,
       kumuliertVerbrenner: verbrenner,
     });
-    expect(v.breakEvenJahr).toBeNull();
     expect(v.differenzGesamtEur).toBe(verbrenner - elektrisch);
   });
 
@@ -106,14 +134,31 @@ describe('vergleichen', () => {
     expect(v.differenzGesamtEur).toBeLessThan(0);
   });
 
-  it('meldet Break-even im Jahr 0, wenn das Elektroauto schon beim Kauf guenstiger ist', () => {
+  it('meldet fruehestens das Jahr 1, auch wenn das Elektroauto klar guenstiger ist', () => {
+    // Im Jahr 0 stehen beide Seiten zwangslaeufig bei null. Ein Treffer dort
+    // waere ein Artefakt des Anfangs, keine Aussage ueber die Kosten.
     const v = vergleichen(
       fahrzeug({ listenpreisEur: 25000 }),
       referenz,
       { kmProJahr: 15000, budgetEur: 50000 },
       annahmen,
     );
-    expect(v.breakEvenJahr).toBe(0);
+    expect(v.breakEvenJahr).toBe(1);
+  });
+
+  it('dreht das Ergebnis, wenn das Elektroauto seinen Wert schlechter haelt', () => {
+    const e = { kmProJahr: 15000, budgetEur: 50000 };
+    const gleich = vergleichen(fahrzeug(), referenz, e, {
+      ...annahmen,
+      wertverlustElektrischProJahr: annahmen.wertverlustVerbrennerProJahr,
+    });
+    const schlechter = vergleichen(fahrzeug(), referenz, e, annahmen);
+
+    // Genau das war der blinde Fleck der frueheren Fassung: ein schnellerer
+    // Wertverlust auf der elektrischen Seite verschlechtert das Ergebnis, und
+    // zwar in einer Groessenordnung, die das Verdikt kippen kann.
+    expect(schlechter.differenzGesamtEur).toBeLessThan(gleich.differenzGesamtEur);
+    expect(gleich.differenzGesamtEur - schlechter.differenzGesamtEur).toBeGreaterThan(1000);
   });
 
   it('findet das kleinste Jahr ohne Mehrkosten', () => {
@@ -170,9 +215,15 @@ describe('empfehlenAus', () => {
         vielfahrer.kmProJahr,
         langerZeitraum,
       );
+    // Ein hoeherer Listenpreis schlaegt nicht mehr voll durch, sondern nur ueber
+    // den Anteil, der bis zum Ende der Haltedauer an Wert verloren geht.
+    const verlustAnteil =
+      1 -
+      Math.pow(1 - langerZeitraum.wertverlustElektrischProJahr, langerZeitraum.haltedauerJahre);
     const spaet = fahrzeug({
       id: 'b-spaet',
-      listenpreisEur: 36000 + langerZeitraum.haltedauerJahre * mehrErsparnisProJahr,
+      listenpreisEur:
+        36000 + (langerZeitraum.haltedauerJahre * mehrErsparnisProJahr) / verlustAnteil,
       verbrauchKwhPro100km: 8,
     });
 

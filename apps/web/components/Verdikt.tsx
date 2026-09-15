@@ -20,7 +20,7 @@ export function Verdikt({ ergebnis }: { ergebnis: Ergebnis }) {
       </p>
 
       <p className="tabellenschrift mt-1 text-[14px] text-muted">
-        {spart ? 'Ersparnis' : 'Mehrkosten'} über {jahre} Jahre, Anschaffung und Betrieb
+        {spart ? 'Ersparnis' : 'Mehrkosten'} über {jahre} Jahre, Wertverlust und Betrieb
         zusammen
       </p>
 

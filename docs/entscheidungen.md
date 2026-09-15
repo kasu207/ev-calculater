@@ -64,6 +64,41 @@ Einwilligung davor. Der Aufwand dafür ist mit 0,25 Personentagen veranschlagt.
 Die Stelle ist `apps/web/components/PartnerCta.tsx`; der Klickpfad ist dort
 bereits gekapselt.
 
+## 5. Restwert im Kostenmodell
+
+**Nachträglich entschieden: enthalten.** Der Restwert stand zunächst unter
+"nicht enthalten, weil belastbare Werte fehlen". Das war bei drei Jahren
+Haltedauer nicht haltbar.
+
+Die Größenordnung: Ein Fahrzeug für 36.000 € verliert in drei Jahren rund
+17.500 € an Wert. Die gesamte berechnete Differenz zwischen Elektro und
+Verbrenner liegt bei einigen hundert bis wenigen tausend Euro. Der größte
+Posten der Rechnung fehlte also, und zwar auf beiden Seiten unterschiedlich
+stark – Elektroautos verlieren derzeit schneller an Wert.
+
+Entscheidend ist nicht die Unsicherheit, sondern die **Richtung**: Der
+weggelassene Posten wirkt nicht neutral, sondern systematisch zugunsten der
+teureren Seite. Ohne ihn zeigte der Rechner bei gleich teuren Fahrzeugen ein zu
+günstiges Bild für das Elektroauto und bei billigeren Elektroautos ein zu
+schlechtes. Eine Zahl, deren Fehler die Größenordnung der Aussage hat, trägt
+kein Vertrauensprodukt – und schon gar keine Seiten, die auf diese Zahl hin
+gefunden werden sollen.
+
+**Umgesetzt** als zwei Annahmen statt als Fahrzeugdaten: 20 Prozent je Jahr
+elektrisch, 16 Prozent beim Verbrenner, geometrisch auf den verbliebenen Wert.
+Dieselbe Begründung wie beim Realaufschlag – modellgenaue Restwertprognosen
+gibt es nicht belegbar frei, und ein offen ausgewiesener Durchschnitt ist
+ehrlicher als erfundene Genauigkeit je Modell.
+
+**Folge für die Darstellung:** Beide Reihen starten im Jahr 0 bei null. Der
+Kostenverlauf zeigt jetzt den Abstand, der sich aus Wertverlust und Betrieb
+aufbaut, statt eines Anschaffungsabstands, den kein Verbrauchsvorteil in drei
+Jahren einholen kann. Das Break-even-Jahr wird ab Jahr 1 gesucht.
+
+**Nicht gelöst:** Der Wertverlust bleibt der unsicherste Wert im Modell. Sobald
+belastbare Restwertdaten je Modell verfügbar sind, gehören sie in die
+Fahrzeugdaten. Bis dahin steht die Annahme sichtbar in der Oberfläche.
+
 ## Abweichungen vom Entwicklungsdokument
 
 Drei Stellen weichen bewusst ab. Alle drei sind Folgen der Technik, nicht der

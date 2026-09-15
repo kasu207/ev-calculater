@@ -6,6 +6,11 @@ import { useState } from 'react';
 import { alsPreis, alsProzent } from '@/lib/format';
 import type { Ergebnis } from '@/lib/ergebnis';
 
+/** Anteil des Listenpreises, der nach der Haltedauer noch im Auto steckt. */
+function restwertAnteil(wertverlustProJahr: number, jahre: number): number {
+  return Math.pow(1 - wertverlustProJahr, jahre);
+}
+
 function Zeile({ was, wert }: { was: string; wert: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-t border-rule py-2">
@@ -54,6 +59,14 @@ export function Annahmen({ ergebnis }: { ergebnis: Ergebnis }) {
             wert={`${alsProzent(annahmen.realaufschlagAnteil)} auf beiden Seiten`}
           />
           <Zeile
+            was="Wertverlust elektrisch"
+            wert={`${alsProzent(annahmen.wertverlustElektrischProJahr)} je Jahr, nach ${annahmen.haltedauerJahre} Jahren ${alsProzent(restwertAnteil(annahmen.wertverlustElektrischProJahr, annahmen.haltedauerJahre))} Restwert`}
+          />
+          <Zeile
+            was="Wertverlust Verbrenner"
+            wert={`${alsProzent(annahmen.wertverlustVerbrennerProJahr)} je Jahr, nach ${annahmen.haltedauerJahre} Jahren ${alsProzent(restwertAnteil(annahmen.wertverlustVerbrennerProJahr, annahmen.haltedauerJahre))} Restwert`}
+          />
+          <Zeile
             was={`Verbrauch ${fahrzeug.marke} ${fahrzeug.modell}`}
             wert={`${fahrzeug.verbrauchKwhPro100km} kWh je 100 km nach WLTP`}
           />
@@ -76,6 +89,12 @@ export function Annahmen({ ergebnis }: { ergebnis: Ergebnis }) {
             Nicht enthalten, weil belastbare Werte fehlen:{' '}
             {NICHT_ENTHALTEN.join(', ')}. Diese Positionen können das Ergebnis in beide
             Richtungen verschieben.
+          </p>
+          <p className="fliesstext mt-2 mb-0 text-[14px] text-ink">
+            Der Wertverlust ist bei dieser Haltedauer der größte Posten der Rechnung, größer
+            als Energie und Steuer zusammen. Er ist ein Durchschnittswert je Antriebsart, kein
+            modellgenauer Prognosewert – bei einem einzelnen Fahrzeug kann er deutlich
+            abweichen.
           </p>
           <p className="fliesstext mt-2 mb-0 text-[14px] text-muted">
             {fahrzeug.quelle}, Stand {fahrzeug.standDatum}. {referenz.quelle}, Stand{' '}

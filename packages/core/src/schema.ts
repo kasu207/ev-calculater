@@ -53,6 +53,8 @@ export const AnnahmenSchema = z.object({
     diesel: z.number().positive(),
   }),
   realaufschlagAnteil: z.number().min(0).max(1),
+  wertverlustElektrischProJahr: z.number().min(0).max(1),
+  wertverlustVerbrennerProJahr: z.number().min(0).max(1),
   haltedauerJahre: z.number().int().positive().max(20),
 });
 

@@ -13,6 +13,7 @@ export {
   empfehlenAus,
   jahreskostenElektrisch,
   jahreskostenVerbrenner,
+  restwert,
   vergleichen,
 } from './berechnung';
 export type { Empfehlung, Jahrespunkt } from './berechnung';

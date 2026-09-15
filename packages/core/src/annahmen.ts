@@ -20,6 +20,28 @@ export const STANDARD_ANNAHMEN: Annahmen = {
   },
   /** Offene Entscheidung 2: Aufschlag auf den WLTP-Wert, beidseitig angesetzt. */
   realaufschlagAnteil: 0.15,
+
+  /**
+   * Wertverlust je Jahr, geometrisch auf den jeweiligen Restwert.
+   *
+   * Bei drei Jahren Haltedauer ist das der groesste Posten der ganzen
+   * Rechnung - groesser als Energie, Steuer und THG-Quote zusammen. Ihn
+   * wegzulassen hiesse, den Vergleich am wichtigsten Punkt offen zu lassen.
+   *
+   * Elektrisch faellt er derzeit hoeher aus: hohe Neuwagenrabatte, schnelle
+   * Modellwechsel und die Unsicherheit ueber die Batterie druecken die
+   * Gebrauchtpreise staerker als beim Verbrenner. 20 Prozent je Jahr
+   * entsprechen rund 51 Prozent Restwert nach drei Jahren, 16 Prozent
+   * rund 59 Prozent.
+   *
+   * Die Werte stehen hier und nicht in den Fahrzeugdaten - aus demselben
+   * Grund wie der Realaufschlag: modellgenaue Restwertprognosen gibt es
+   * nicht belegbar frei, und eine erfundene Genauigkeit je Fahrzeug waere
+   * schlechter als ein offen ausgewiesener Durchschnitt.
+   */
+  wertverlustElektrischProJahr: 0.2,
+  wertverlustVerbrennerProJahr: 0.16,
+
   /** Entscheidung 1: drei Jahre, die uebliche Haltedauer im Dienstwagen. */
   haltedauerJahre: 3,
 };
@@ -28,7 +50,6 @@ export const STANDARD_ANNAHMEN: Annahmen = {
 export const NICHT_ENTHALTEN = [
   'Wartung und Verschleiss',
   'Versicherung',
-  'Restwert beim Verkauf',
   'Foerderungen und Zuschuesse',
   'Finanzierungs- und Leasingkosten',
 ] as const;

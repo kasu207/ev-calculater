@@ -42,9 +42,8 @@ export function verdiktSatz(ergebnis: Ergebnis): string {
   if (empfehlung.breakEvenJahr === null) {
     return `Der ${name} rechnet sich in ${jahre} Jahren nicht gegen den ${gegen}.`;
   }
-  if (empfehlung.breakEvenJahr === 0) {
-    return `Der ${name} ist vom ersten Tag an günstiger als der ${gegen}.`;
-  }
+  // Jahr 0 kommt nicht mehr vor: dort stehen beide Seiten bei null, weil der
+  // Listenpreis noch vollstaendig im Fahrzeug steckt.
   if (empfehlung.breakEvenJahr === 1) {
     return `Der ${name} rechnet sich nach einem Jahr gegen den ${gegen}.`;
   }

@@ -49,23 +49,35 @@ Verglichen werden die kumulierten Kosten eines Elektromodells und eines
 vergleichbaren Verbrenners über die Haltedauer:
 
 ```
-kumuliert(jahr) = listenpreis + jahr × (energie + kfz_steuer − thg_quote)
+wertverlust(jahr) = listenpreis × (1 − wertverlust_pro_jahr ^ jahr)
+kumuliert(jahr)   = wertverlust(jahr) + jahr × (energie + kfz_steuer − thg_quote)
 ```
 
-Enthalten sind Anschaffung zum Listenpreis, Energiekosten, Kfz-Steuer und die
-THG-Quote als Gutschrift. Nicht enthalten sind Wartung, Versicherung, Restwert,
-Förderung und Finanzierung. Diese Auslassung steht im aufklappbaren
-Annahmen-Bereich der Oberfläche, weil ein Vertrauensprodukt keine Lücke
-verschweigen darf, die das Ergebnis verschiebt.
+Gerechnet wird, was das Fahrzeug bis zum Jahr N gekostet hat, wenn man es dann
+verkauft. Beide Reihen starten deshalb im Jahr 0 bei null: Zum Kaufzeitpunkt ist
+noch nichts verloren, der Listenpreis steckt vollständig im Auto.
+
+Enthalten sind Wertverlust, Energiekosten, Kfz-Steuer und die THG-Quote als
+Gutschrift. Nicht enthalten sind Wartung, Versicherung, Förderung und
+Finanzierung. Diese Auslassung steht im aufklappbaren Annahmen-Bereich der
+Oberfläche, weil ein Vertrauensprodukt keine Lücke verschweigen darf, die das
+Ergebnis verschiebt.
+
+Der Wertverlust ist bei drei Jahren Haltedauer der größte Posten der Rechnung –
+größer als Energie und Steuer zusammen. Er wird als Durchschnitt je Antriebsart
+angesetzt (elektrisch 20 Prozent, Verbrenner 16 Prozent je Jahr) und nicht je
+Modell: Modellgenaue Restwertprognosen gibt es nicht belegbar frei, und eine
+erfundene Genauigkeit wäre schlechter als ein offen ausgewiesener Durchschnitt.
 
 **Auswahlregel:** Unter allen Fahrzeugen im Budget gewinnt das mit der höchsten
 Gesamtdifferenz. Bei Gleichstand das mit dem früheren Break-even, danach die
 alphabetisch erste Kennung, damit dieselbe Eingabe immer dasselbe Ergebnis
 liefert.
 
-**Break-even:** das kleinste Jahr, in dem die kumulierten Elektrokosten die des
-Verbrenners nicht mehr überschreiten. Gibt es innerhalb der Haltedauer keines,
-ist `breakEvenJahr` null, und die Oberfläche sagt das in einem Satz.
+**Break-even:** das kleinste Jahr **ab 1**, in dem die kumulierten Elektrokosten
+die des Verbrenners nicht mehr überschreiten. Jahr 0 ist ausgenommen, weil dort
+beide Seiten zwangsläufig bei null stehen. Gibt es innerhalb der Haltedauer
+keines, ist `breakEvenJahr` null, und die Oberfläche sagt das in einem Satz.
 
 Die Standardannahmen stehen in `packages/core/src/annahmen.ts`. Jede Änderung
 dort verschiebt jedes Ergebnis, deshalb gehört eine Quelle in den Pull Request.
