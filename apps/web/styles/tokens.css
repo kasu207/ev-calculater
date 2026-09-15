@@ -1,0 +1,20 @@
+/*
+ * Farb- und Formwerte des Produkts. Eine Quelle, keine zweite Palette.
+ * Signalgelb bedeckt nie mehr als fuenf Prozent der Flaeche und steht nie
+ * als Textfarbe auf Weiss.
+ */
+:root {
+  --ink: #14203a;
+  --canvas: #edeff2;
+  --sheet: #ffffff;
+  --signal: #f5b301;
+  --saving: #1f7a5c;
+  --cost: #b3382b;
+  --muted: #6b7488;
+
+  --radius-control: 4px;
+  --radius-sheet: 8px;
+  --rule: color-mix(in srgb, var(--ink) 12%, transparent);
+  --rule-stark: color-mix(in srgb, var(--ink) 24%, transparent);
+  --flaeche-still: color-mix(in srgb, var(--ink) 4%, transparent);
+}

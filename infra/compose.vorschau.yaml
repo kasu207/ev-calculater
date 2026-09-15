@@ -1,0 +1,34 @@
+# Vorschau auf dem eigenen Server, ohne Registry und ohne TLS.
+#
+# Baut das Image aus dem ausgecheckten Stand und stellt die Anwendung auf
+# Port 9001 bereit. Caddy, Umami und die Sicherung bleiben aussen vor: Das hier
+# ist zum Anschauen, nicht zum Betrieb. Der Produktivstand steht in compose.yaml.
+#
+#   cd ev-calculater
+#   docker compose -f infra/compose.vorschau.yaml up -d --build
+#   curl -s http://localhost:9001/api/health
+#
+# Beenden und aufräumen:
+#   docker compose -f infra/compose.vorschau.yaml down --rmi local
+
+name: ampmatch-vorschau
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    ports: ["9001:9000"]
+    environment:
+      PORT: "9000"
+      HOSTNAME: "0.0.0.0"
+      # Ohne echte Domain zeigen Canonical, Sitemap und Vorschaubild hierher.
+      AMPMATCH_BASIS_URL: ${AMPMATCH_BASIS_URL:-http://localhost:9001}
+      # Bewusst leer: keine Statistik und kein Partner-Tracking in der Vorschau.
+      # Impressum und Datenschutz weisen offen aus, dass die Angaben fehlen.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

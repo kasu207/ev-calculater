@@ -1,0 +1,76 @@
+services:
+  web:
+    image: ghcr.io/${GHCR_NAMESPACE:-ampmatch}/web:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: "9000"
+      HOSTNAME: "0.0.0.0"
+      AMPMATCH_BASIS_URL: ${AMPMATCH_BASIS_URL}
+      AMPMATCH_UMAMI_SKRIPT_URL: ${AMPMATCH_UMAMI_SKRIPT_URL}
+      AMPMATCH_UMAMI_WEBSITE_ID: ${AMPMATCH_UMAMI_WEBSITE_ID}
+      AMPMATCH_FLEXOFFERS_DEEPLINK_BASIS: ${AMPMATCH_FLEXOFFERS_DEEPLINK_BASIS}
+      AMPMATCH_FLEXOFFERS_SUBID: ${AMPMATCH_FLEXOFFERS_SUBID}
+      AMPMATCH_BETREIBER_NAME: ${AMPMATCH_BETREIBER_NAME}
+      AMPMATCH_BETREIBER_ANSCHRIFT: ${AMPMATCH_BETREIBER_ANSCHRIFT}
+      AMPMATCH_BETREIBER_EMAIL: ${AMPMATCH_BETREIBER_EMAIL}
+      AMPMATCH_BETREIBER_TELEFON: ${AMPMATCH_BETREIBER_TELEFON}
+      AMPMATCH_BETREIBER_USTID: ${AMPMATCH_BETREIBER_USTID}
+    expose: ["9000"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web]
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    restart: unless-stopped
+    environment:
+      DATABASE_TYPE: postgresql
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PW}@umami-db:5432/umami
+      APP_SECRET: ${UMAMI_SECRET}
+    expose: ["3000"]
+    depends_on: [umami-db]
+
+  umami-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PW}
+    volumes: ["umami_db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Die Messdaten sind das einzige Ergebnis des Sprints. Ohne Sicherung waere
+  # ein Serverausfall in Woche drei der Totalverlust der Arbeit.
+  sicherung:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${UMAMI_DB_PW}
+    volumes:
+      - umami_sicherung:/sicherung
+      - ./sicherung.sh:/sicherung.sh:ro
+    entrypoint: ["sh", "/sicherung.sh"]
+    depends_on: [umami-db]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  umami_db:
+  umami_sicherung:
