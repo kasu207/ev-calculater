@@ -42,6 +42,13 @@ function fahrzeug(ueberschreibung: Partial<Fahrzeug> = {}): Fahrzeug {
 
 const annahmen: Annahmen = { ...STANDARD_ANNAHMEN };
 
+/**
+ * Manche Faelle brauchen einen Zeitraum, in dem der Break-even ueberhaupt
+ * liegen kann. Sie setzen die Haltedauer selbst, damit sie nicht kippen, wenn
+ * die Standardannahme sich aendert.
+ */
+const langerZeitraum: Annahmen = { ...STANDARD_ANNAHMEN, haltedauerJahre: 8 };
+
 describe('vergleichen', () => {
   it('startet im Jahr 0 mit den reinen Listenpreisen', () => {
     const v = vergleichen(fahrzeug(), referenz, { kmProJahr: 15000, budgetEur: 50000 }, annahmen);
@@ -74,14 +81,18 @@ describe('vergleichen', () => {
 
   it('rechnet ohne Fahrleistung nur Anschaffung, Steuer und THG-Quote', () => {
     const v = vergleichen(fahrzeug(), referenz, { kmProJahr: 0, budgetEur: 50000 }, annahmen);
-    // 6 Jahre: Verbrenner 100 Euro Steuer, elektrisch 70 Euro Gutschrift.
+    // Ohne Fahrleistung bleiben je Jahr 100 Euro Steuer auf der Verbrennerseite
+    // und 70 Euro THG-Gutschrift auf der elektrischen.
+    const jahre = annahmen.haltedauerJahre;
+    const elektrisch = 36000 - jahre * 70;
+    const verbrenner = 30000 + jahre * 100;
     expect(v.jahresreihe.at(-1)).toEqual({
-      jahr: 6,
-      kumuliertElektrisch: 36000 - 6 * 70,
-      kumuliertVerbrenner: 30000 + 6 * 100,
+      jahr: jahre,
+      kumuliertElektrisch: elektrisch,
+      kumuliertVerbrenner: verbrenner,
     });
     expect(v.breakEvenJahr).toBeNull();
-    expect(v.differenzGesamtEur).toBe(30600 - 35580);
+    expect(v.differenzGesamtEur).toBe(verbrenner - elektrisch);
   });
 
   it('meldet keinen Break-even, wenn er ausserhalb der Haltedauer liegt', () => {
@@ -106,7 +117,12 @@ describe('vergleichen', () => {
   });
 
   it('findet das kleinste Jahr ohne Mehrkosten', () => {
-    const v = vergleichen(fahrzeug(), referenz, { kmProJahr: 30000, budgetEur: 50000 }, annahmen);
+    const v = vergleichen(
+      fahrzeug(),
+      referenz,
+      { kmProJahr: 30000, budgetEur: 50000 },
+      langerZeitraum,
+    );
     const jahr = v.breakEvenJahr;
     expect(jahr).not.toBeNull();
     const punkt = v.jahresreihe[jahr!]!;
@@ -142,28 +158,32 @@ describe('empfehlenAus', () => {
 
   it('entscheidet den Gleichstand ueber den frueheren Break-even', () => {
     // Beide Modelle haben dieselbe Gesamtdifferenz: das sparsamere kostet in der
-    // Anschaffung genau so viel mehr, wie es ueber sechs Jahre zusaetzlich spart.
+    // Anschaffung genau so viel mehr, wie es ueber den Zeitraum zusaetzlich spart.
     const vielfahrer = { kmProJahr: 30000, budgetEur: 60000 };
     const guenstigeReferenz: Referenz = { ...referenz, listenpreisEur: 30000 };
 
     const frueh = fahrzeug({ id: 'a-frueh', listenpreisEur: 36000, verbrauchKwhPro100km: 16 });
     const mehrErsparnisProJahr =
-      jahreskostenElektrisch(frueh, vielfahrer.kmProJahr, annahmen) -
-      jahreskostenElektrisch(fahrzeug({ verbrauchKwhPro100km: 8 }), vielfahrer.kmProJahr, annahmen);
+      jahreskostenElektrisch(frueh, vielfahrer.kmProJahr, langerZeitraum) -
+      jahreskostenElektrisch(
+        fahrzeug({ verbrauchKwhPro100km: 8 }),
+        vielfahrer.kmProJahr,
+        langerZeitraum,
+      );
     const spaet = fahrzeug({
       id: 'b-spaet',
-      listenpreisEur: 36000 + annahmen.haltedauerJahre * mehrErsparnisProJahr,
+      listenpreisEur: 36000 + langerZeitraum.haltedauerJahre * mehrErsparnisProJahr,
       verbrauchKwhPro100km: 8,
     });
 
-    const a = vergleichen(frueh, guenstigeReferenz, vielfahrer, annahmen);
-    const b = vergleichen(spaet, guenstigeReferenz, vielfahrer, annahmen);
+    const a = vergleichen(frueh, guenstigeReferenz, vielfahrer, langerZeitraum);
+    const b = vergleichen(spaet, guenstigeReferenz, vielfahrer, langerZeitraum);
     expect(a.differenzGesamtEur).toBe(b.differenzGesamtEur);
     expect(a.breakEvenJahr).not.toBeNull();
     expect(b.breakEvenJahr).not.toBeNull();
     expect(a.breakEvenJahr!).toBeLessThan(b.breakEvenJahr!);
 
-    const ergebnis = empfehlenAus([spaet, frueh], [guenstigeReferenz], vielfahrer, annahmen);
+    const ergebnis = empfehlenAus([spaet, frueh], [guenstigeReferenz], vielfahrer, langerZeitraum);
     expect(ergebnis?.modellId).toBe('a-frueh');
   });
 

@@ -121,6 +121,6 @@ Begründung und Messung in `docs/entscheidungen.md`.
 ## Offene Entscheidungen
 
 Der Stand der vier offenen Punkte aus Abschnitt 15 des Entwicklungsdokuments
-steht in `docs/entscheidungen.md`. Kurz: Haltedauer sechs Jahre, Realaufschlag
+steht in `docs/entscheidungen.md`. Kurz: Haltedauer drei Jahre, Realaufschlag
 15 Prozent auf beiden Seiten, Heimladeanteil 80 Prozent als feste Annahme, der
 Einwilligungsdialog hängt weiter an der rechtlichen Prüfung.

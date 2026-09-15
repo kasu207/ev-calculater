@@ -20,8 +20,8 @@ export const STANDARD_ANNAHMEN: Annahmen = {
   },
   /** Offene Entscheidung 2: Aufschlag auf den WLTP-Wert, beidseitig angesetzt. */
   realaufschlagAnteil: 0.15,
-  /** Offene Entscheidung 1: sechs Jahre, bis eine andere Haltedauer beschlossen ist. */
-  haltedauerJahre: 6,
+  /** Entscheidung 1: drei Jahre, die uebliche Haltedauer im Dienstwagen. */
+  haltedauerJahre: 3,
 };
 
 /** Was das Kostenmodell bewusst nicht enthaelt. Wird in der Oberflaeche ausgewiesen. */

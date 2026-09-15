@@ -6,14 +6,25 @@ jeweils der im Dokument vorgeschlagene Wert. Jeder steht an einer Stelle
 
 ## 1. Haltedauer im Rechenmodell
 
-**Umgesetzt: sechs Jahre.** Das ist der Wert aus dem Dokument, keine
-Entscheidung gegen die Dienstwagenperspektive.
+**Entschieden: drei Jahre.** Das ist die übliche Haltedauer im Dienstwagen und
+damit die Perspektive der Zielgruppe. Der Wert aus dem Entwicklungsdokument
+(sechs Jahre) ist damit abgelöst.
 
-Die Haltedauer verschiebt jedes Ergebnis erheblich: Sie bestimmt, wie oft die
-jährliche Ersparnis den höheren Kaufpreis aufholen darf. Bei drei bis vier
-Jahren, wie im Dienstwagen üblich, kippen mehrere Modelle vom Vorteil in den
-Nachteil. Solange offen ist, ob die Zielgruppe privat oder gewerblich kauft,
-bleibt es bei sechs Jahren. Umstellung: eine Zahl in `STANDARD_ANNAHMEN`.
+Die Umstellung verschärft das Bild erheblich, und zwar richtigerweise: Bei
+15.000 km im Jahr erreichen jetzt 14 der 20 Modelle innerhalb des Zeitraums
+keinen Break-even mehr, vorher waren es 8. Drei Jahre sind schlicht zu kurz,
+damit eine jährliche Ersparnis von rund 900 € einen Mehrpreis von mehreren
+tausend Euro aufholt. Empfohlen wird weiterhin ein Fahrzeug mit positivem
+Ergebnis, weil die Auswahlregel die höchste Gesamtdifferenz nimmt und diese
+Modelle schon im Listenpreis unter ihrer Verbrenner-Referenz liegen.
+
+Für die Oberfläche heißt das: Der Satz "rechnet sich in drei Jahren nicht gegen
+den …" wird häufiger zu sehen sein. Das ist kein Fehler, sondern das ehrliche
+Ergebnis eines kurzen Zeitraums, und es ist der Grund, warum der Rechner das
+Break-even-Jahr überhaupt ausweist.
+
+Geändert wird der Wert an einer Stelle: `haltedauerJahre` in
+`packages/core/src/annahmen.ts`.
 
 ## 2. Realaufschlag auf den WLTP-Verbrauch
 
