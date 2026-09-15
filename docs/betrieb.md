@@ -17,6 +17,29 @@ docker compose -f infra/compose.vorschau.yaml up -d --build
 curl -s http://localhost:9001/api/health
 ```
 
+### Speicherbedarf
+
+Der Build braucht in der Spitze rund 1,4 GB nur für die Kompilierung, dazu
+kommen Docker und alles, was auf dem Server sonst läuft. Unter etwa 2 GB
+freiem Speicher bricht er mit `SIGKILL` ab: Das ist der OOM-Killer, kein
+Fehler im Code.
+
+Auf einem Server ohne Auslagerungsdatei hilft eine:
+
+```bash
+free -h
+sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+free -h
+```
+
+Dauerhaft eintragen: `echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`.
+Wieder loswerden: `sudo swapoff /swapfile && sudo rm /swapfile`.
+
+Der Build dauert mit Auslagerung spürbar länger, läuft aber durch. Wer den
+Server ganz aus dem Spiel lassen will, lässt das Image in der CI bauen und
+zieht es nur noch: siehe Auslieferung weiter unten.
+
 Danach liegt der Rechner auf Port 9001. Ohne geöffneten Port in der Firewall
 kommt man per SSH-Tunnel heran: `ssh -L 9001:localhost:9001 nutzer@server`,
 dann im eigenen Browser `http://localhost:9001`.
